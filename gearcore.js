@@ -45,8 +45,8 @@
     ratio: 15,              // n_青 / n_黄
     ratioTolPct: 0,         // 比の許容誤差 [%]
     // 3Dプリント前提でモジュールは任意 → 下限〜上限を刻みで走査
-    modMin: 0.4,
-    modMax: 1.2,
+    modMin: 0.5,            // 0.5 以上必須（1 以上が望ましい）
+    modMax: 1.5,
     modStep: 0.05,
     allowTwoLayer: true,    // 緑を二層構造にしてよいか
     pressureAngleDeg: 20,
@@ -63,6 +63,7 @@
     brownD: 112,
     clrPart: 0.5,           // 歯先円 ↔ 水色部品 の最小すき間
     clrGear: 0.5,           // かみ合わない歯車同士の歯先円の最小すき間
+    blueShaftD: 8,          // 青の軸径（二層構造時は赤 ↔ 青軸 で判定）
     checkCrossLayer: true,  // 赤・青・緑一層目の歯先円が黄の歯先円（内側）に収まるか
     xbMin: 0,               // 青は右側（図3 の傘歯車側）
     xbMax: 80,
@@ -200,6 +201,11 @@
     return { R, B, G, Y: [0, 0] };
   }
 
+  // 赤が避けるべき青側の半径（一層: 青の歯先円, 二層: 青の軸）
+  function blueObstacleR(cfg, D) {
+    return D.layered ? cfg.blueShaftD / 2 : D.B.da / 2;
+  }
+
   // ---------------------------------------------------------------------------
   // 厳密評価（詳細表示・最終値用）: 全制約の余裕 [mm]（≥0 で成立）
   // ---------------------------------------------------------------------------
@@ -230,17 +236,24 @@
           'すき間 ' + (pd.d - r).toFixed(3) + ' mm');
       }
     }
+    // 一層: 赤・青が同一面 → 歯先円同士。二層: 赤は片持ちで青歯車とは別面 → 赤歯先円 ↔ 青の軸
     const dRB = Math.hypot(P.R[0] - P.B[0], P.R[1] - P.B[1]);
-    add('C5a', '赤 ↔ 青 歯先円', dRB - rR - rB - cfg.clrGear, 'すき間 ' + (dRB - rR - rB).toFixed(3) + ' mm');
+    const rBx = blueObstacleR(cfg, D);
+    add('C5a', D.layered ? '赤 歯先円 ↔ 青 軸φ' + cfg.blueShaftD : '赤 ↔ 青 歯先円', dRB - rR - rBx - cfg.clrGear,
+      'すき間 ' + (dRB - rR - rBx).toFixed(3) + ' mm');
     if (cfg.checkCrossLayer) {
       const rYa = D.Y.da / 2;
       add('C5b', '赤 歯先円 ⊂ 黄 歯先円', rYa - Math.hypot(P.R[0], P.R[1]) - rR - cfg.clrGear, '');
       add('C5c', '青 歯先円 ⊂ 黄 歯先円', rYa - Math.hypot(P.B[0], P.B[1]) - rB - cfg.clrGear, '');
       if (D.layered) add('C5d', '緑(一層目) 歯先円 ⊂ 黄 歯先円', rYa - D.aGY - D.G1.da / 2 - cfg.clrGear, '');
     }
-    let minSlack = Infinity;
-    for (const it of items) if (it.slack < minSlack) minSlack = it.slack;
-    return { D, P, items, minSlack, ok: minSlack >= -1e-9 };
+    // 最小余裕 = 配置に関わるすき間（C3〜C5）の最小値。C2・C6 は成否判定のみ
+    let minSlack = Infinity, ok = true;
+    for (const it of items) {
+      if (it.slack < -1e-9) ok = false;
+      if (!/^C2|^C6/.test(it.id) && it.slack < minSlack) minSlack = it.slack;
+    }
+    return { D, P, items, minSlack, ok };
   }
 
   // ---------------------------------------------------------------------------
@@ -260,7 +273,7 @@
   function slackR(cfg, D, field, R, B, rR) {
     const rn = Math.hypot(R[0], R[1]);
     let s = (cfg.brownD - cfg.purpleD) / 2 - rn;
-    s = Math.min(s, Math.hypot(R[0] - B[0], R[1] - B[1]) - rR - D.B.da / 2 - cfg.clrGear);
+    s = Math.min(s, Math.hypot(R[0] - B[0], R[1] - B[1]) - rR - blueObstacleR(cfg, D) - cfg.clrGear);
     if (cfg.checkCrossLayer) s = Math.min(s, D.Y.da / 2 - rn - rR - cfg.clrGear);
     if (s < 0) return s;
     return Math.min(s, field.at(R[0], R[1]) - rR - cfg.clrPart);

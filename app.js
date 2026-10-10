@@ -25,7 +25,8 @@
     ['grp', '寸法 [mm]'],
     ['yellowRootMax', '黄 歯底円直径 上限', 'num'], ['blueY', '青 中心 y', 'num'], ['purpleD', '紫円 直径', 'num'], ['brownD', '茶円 直径', 'num'],
     ['grp', 'すき間 [mm]'],
-    ['clrPart', '歯先円 ↔ 水色部品', 'num'], ['clrGear', '歯先円 ↔ 歯先円', 'num'],
+    ['clrPart', '歯先円 ↔ 水色部品', 'num'], ['clrGear', '歯先円 ↔ 歯先円・軸', 'num'],
+    ['blueShaftD', '青 軸径（二層時の赤↔青判定）', 'num'],
     ['checkCrossLayer', '赤・青・緑1 が黄の歯先円内', 'bool'],
     ['grp', '配置探索 [mm]'],
     ['xbMin', '青 x 下限', 'num'], ['xbMax', '青 x 上限', 'num'], ['xbStep', '青 x 刻み', 'num'],
@@ -268,6 +269,7 @@
       if (showRoot) shapes.push({ kind: 'circle', id: id + '.df', name: nm + ' 歯底円', c, r: g.df / 2, color: col, width: 1, dash: '2 3', info: base });
       if (id !== 'G2') shapes.push({ kind: 'point', id: id + '.c', name: nm + ' 中心', p: c, color: col, draw: true });
     }
+    if (P && D.layered) shapes.push({ kind: 'circle', id: 'B.shaft', name: '青 軸', c: P.B, r: cfg.blueShaftD / 2, color: 'var(--blue)', width: 1, dash: '', info: ['二層時は赤の歯先円とこの軸で干渉判定'] });
     shapes.push({ kind: 'circle', id: 'BR', name: '茶円', c: [0, 0], r: cfg.brownD / 2, color: 'var(--brown)', width: 1.5, dash: '', info: ['黄と同心'] });
     if (P) shapes.push({ kind: 'circle', id: 'PU', name: '紫円', c: P.R, r: cfg.purpleD / 2, color: 'var(--purple)', width: 1.5, dash: '', info: ['赤と同心'] });
     for (const part of GC.PARTS) {
