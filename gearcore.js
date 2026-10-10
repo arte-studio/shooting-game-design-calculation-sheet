@@ -44,12 +44,15 @@
   const DEFAULTS = {
     ratio: 15,              // n_青 / n_黄
     ratioTolPct: 0,         // 比の許容誤差 [%]
-    modules: [0.3, 0.4, 0.5, 0.6, 0.8, 1.0],
+    // 3Dプリント前提でモジュールは任意 → 下限〜上限を刻みで走査
+    modMin: 0.4,
+    modMax: 1.2,
+    modStep: 0.05,
     allowTwoLayer: true,    // 緑を二層構造にしてよいか
     pressureAngleDeg: 20,
     addendum: 1.0,          // 歯末の丈係数
     dedendum: 1.25,         // 歯元の丈係数
-    zMin: 12,
+    zMin: 17,               // 強度上の最小歯数
     zMaxRed: 60,
     zMaxBlue: 100,
     zMaxGreen: 200,
@@ -61,7 +64,7 @@
     clrPart: 0.5,           // 歯先円 ↔ 水色部品 の最小すき間
     clrGear: 0.5,           // かみ合わない歯車同士の歯先円の最小すき間
     checkCrossLayer: true,  // 赤・青・緑一層目の歯先円が黄の歯先円（内側）に収まるか
-    xbMin: -80,
+    xbMin: 0,               // 青は右側（図3 の傘歯車側）
     xbMax: 80,
     xbStep: 1.0,
     maxResults: 200000,
@@ -330,6 +333,16 @@
     };
   }
 
+  function moduleList(cfg) {
+    const out = [];
+    for (let k = 0; ; k++) {
+      const m = Math.round((cfg.modMin + k * cfg.modStep) * 1e6) / 1e6;
+      if (m > cfg.modMax + 1e-9 || cfg.modStep <= 0) break;
+      out.push(m);
+    }
+    return out;
+  }
+
   // ---------------------------------------------------------------------------
   // 歯車組の列挙（速度比・単体条件のみ）
   // ---------------------------------------------------------------------------
@@ -339,7 +352,7 @@
     const tol = cfg.ratioTolPct / 100;
     const ha = cfg.addendum, hf = cfg.dedendum;
     const cosA = Math.cos((cfg.pressureAngleDeg * Math.PI) / 180);
-    const mods = cfg.modules.slice().sort((a, b) => a - b);
+    const mods = moduleList(cfg);
     for (const m1 of mods) for (const m2 of mods) {
       if (!cfg.allowTwoLayer && m1 !== m2) continue;
       const zyMax = Math.floor(cfg.yellowRootMax / m2 - 2 * hf + 1e-9);
@@ -445,6 +458,6 @@
   return {
     PX_PER_MM, PARTS, FIGURES, FIG2_REFERENCE, DEFAULTS,
     polyDist, pointInPoly, gearDims, derive, greenCenter, positions,
-    evaluate, enumerate, solveCombo, createSearch, runSearch, optimizePlacement, getField,
+    evaluate, enumerate, moduleList, solveCombo, createSearch, runSearch, optimizePlacement, getField,
   };
 });

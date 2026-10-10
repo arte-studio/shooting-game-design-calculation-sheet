@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>歯車列 設計計算シート</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>歯車列 設計計算シート</h1>
+  <span class="sub">赤(駆動) → 緑(中間) → 青(出力1) / 黄(出力2, 内歯車)　n<sub>青</sub>:n<sub>黄</sub> = <span id="hdrRatio">15</span>:1</span>
+</header>
+
+<main>
+  <!-- 左: 条件と結果一覧 -->
+  <section id="left">
+    <details open>
+      <summary>条件</summary>
+      <form id="cfgForm" class="cfg"></form>
+      <div class="row">
+        <button id="btnRun" type="button">探索実行</button>
+        <button id="btnReset" type="button" class="ghost">既定値に戻す</button>
+      </div>
+      <div id="progress" class="progress"><div></div><span></span></div>
+    </details>
+
+    <details open>
+      <summary>成立解 <span id="resCount"></span></summary>
+      <div class="filters">
+        <label>m1 <select id="fM1"><option value="">全て</option></select></label>
+        <label>m2 <select id="fM2"><option value="">全て</option></select></label>
+        <label>構造 <select id="fLayer"><option value="">全て</option><option value="1">一層</option><option value="2">二層</option></select></label>
+      </div>
+      <div class="tableWrap">
+        <table id="resTable">
+          <thead><tr>
+            <th data-k="m1">m1</th><th data-k="m2">m2</th><th data-k="zr">z赤</th><th data-k="zb">z青</th>
+            <th data-k="zg1">z緑1</th><th data-k="zg2">z緑2</th><th data-k="zy">z黄</th>
+            <th data-k="layered">層</th><th data-k="ratioErrPct">比誤差%</th><th data-k="yellowDf">黄df</th><th data-k="score">余裕</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="row pager"><button id="pgPrev" class="ghost">◀</button><span id="pgInfo"></span><button id="pgNext" class="ghost">▶</button></div>
+    </details>
+  </section>
+
+  <!-- 中央: 図 -->
+  <section id="center">
+    <div class="toolbar">
+      <label>背景 <select id="bgSel"><option value="">なし</option></select></label>
+      <label>不透明度 <input type="range" id="bgOp" min="0" max="1" step="0.05" value="0.45"></label>
+      <label><input type="checkbox" id="showTip" checked> 歯先円</label>
+      <label><input type="checkbox" id="showRoot"> 歯底円</label>
+      <label><input type="checkbox" id="showLabels" checked> ラベル</label>
+      <button id="btnFit" class="ghost">全体表示</button>
+      <button id="btnClearMeas" class="ghost">計測クリア</button>
+    </div>
+    <div id="viewWrap">
+      <svg id="view"></svg>
+      <div id="tooltip"></div>
+    </div>
+    <div class="status"><span id="cursorPos">x: – y: –</span><span class="hint">ホイール: ズーム / ドラッグ: 移動 / 右クリック×2: 2点間距離 (Shift で吸着なし, Esc で取消)</span></div>
+  </section>
+
+  <!-- 右: 詳細 -->
+  <section id="right">
+    <details open>
+      <summary>選択中の解</summary>
+      <div id="selSummary" class="muted">表から解を選択してください（未選択時は図2の配置を表示）。</div>
+      <div id="placeCtl" class="placeCtl"></div>
+    </details>
+    <details open>
+      <summary>歯車寸法</summary>
+      <table id="gearTable" class="small"></table>
+    </details>
+    <details open>
+      <summary>制約チェック（余裕 ≥ 0 で成立）</summary>
+      <table id="consTable" class="small"></table>
+    </details>
+  </section>
+</main>
+
+<script src="gearcore.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
