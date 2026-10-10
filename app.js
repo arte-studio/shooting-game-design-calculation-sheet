@@ -31,7 +31,7 @@
     ['grp', '配置探索 [mm]'],
     ['xbMin', '青 x 下限', 'num'], ['xbMax', '青 x 上限', 'num'], ['xbStep', '青 x 刻み', 'num'],
   ];
-  const STORE_KEY = 'gearsheet.cfg.v1';
+  const STORE_KEY = 'gearsheet.cfg.v2';
 
   function loadCfg() {
     let saved = {};
