@@ -45,8 +45,8 @@
     ratio: 15,              // n_青 / n_黄
     ratioTolPct: 0,         // 比の許容誤差 [%]
     // 3Dプリント前提でモジュールは任意 → 下限〜上限を刻みで走査
-    modMin: 0.5,            // 0.5 以上必須（1 以上が望ましい）
-    modMax: 1.5,
+    modMin: 1.0,            // 1 以上が望ましい（0.5 以上必須。0.5 まで下げると探索は数分）
+    modMax: 2.0,
     modStep: 0.05,
     allowTwoLayer: true,    // 緑を二層構造にしてよいか
     pressureAngleDeg: 20,
@@ -64,7 +64,9 @@
     clrPart: 0.5,           // 歯先円 ↔ 水色部品 の最小すき間
     clrGear: 0.5,           // かみ合わない歯車同士の歯先円の最小すき間
     blueShaftD: 8,          // 青の軸径（二層構造時は赤 ↔ 青軸 で判定）
-    checkCrossLayer: true,  // 赤・青・緑一層目の歯先円が黄の歯先円（内側）に収まるか
+    checkCrossLayer: true,  // 赤・青の歯先円が黄の歯先円（内側）に収まるか
+    green1InYellow: false,  // 二層時, 緑一層目の歯先円も黄の歯先円内に収めるか（false: 別の面なので外に出てよい）
+    green1OuterMax: 90,     // 緑一層目 歯先の最外点の上限半径（外周ホイール 外径 φ179.8 相当）
     xbMin: 0,               // 青は右側（図3 の傘歯車側）
     xbMax: 80,
     xbStep: 1.0,
@@ -245,7 +247,11 @@
       const rYa = D.Y.da / 2;
       add('C5b', '赤 歯先円 ⊂ 黄 歯先円', rYa - Math.hypot(P.R[0], P.R[1]) - rR - cfg.clrGear, '');
       add('C5c', '青 歯先円 ⊂ 黄 歯先円', rYa - Math.hypot(P.B[0], P.B[1]) - rB - cfg.clrGear, '');
-      if (D.layered) add('C5d', '緑(一層目) 歯先円 ⊂ 黄 歯先円', rYa - D.aGY - D.G1.da / 2 - cfg.clrGear, '');
+    }
+    if (D.layered) {
+      const reach = D.aGY + D.G1.da / 2;
+      if (cfg.green1InYellow) add('C5d', '緑(一層目) 歯先円 ⊂ 黄 歯先円', D.Y.da / 2 - reach - cfg.clrGear, '最外点 半径 ' + reach.toFixed(3));
+      else add('C5e', '緑(一層目) 最外点 ≤ 半径 ' + cfg.green1OuterMax, cfg.green1OuterMax - reach, '最外点 半径 ' + reach.toFixed(3) + '（黄の歯先円の外側は可）');
     }
     // 最小余裕 = 配置に関わるすき間（C3〜C5）の最小値。C2・C6 は成否判定のみ
     let minSlack = Infinity, ok = true;
@@ -365,7 +371,7 @@
     const tol = cfg.ratioTolPct / 100;
     const ha = cfg.addendum, hf = cfg.dedendum;
     const cosA = Math.cos((cfg.pressureAngleDeg * Math.PI) / 180);
-    const mods = moduleList(cfg);
+    const mods = moduleList(cfg).reverse(); // 大きいモジュールから（件数上限で打ち切っても大きい側が残る）
     for (const m1 of mods) for (const m2 of mods) {
       if (!cfg.allowTwoLayer && m1 !== m2) continue;
       const zyMax = Math.floor(cfg.yellowRootMax / m2 - 2 * hf + 1e-9);
@@ -384,7 +390,10 @@
               const layered = !(m1 === m2 && zg1 === zg2);
               if (layered && !cfg.allowTwoLayer) continue;
               if (!layered && m1 !== m2) continue;
-              if (layered && cfg.checkCrossLayer && aGY + (m1 * (zg1 + 2 * ha)) / 2 > rYa - cfg.clrGear) continue;
+              if (layered) {
+                const reach = aGY + (m1 * (zg1 + 2 * ha)) / 2;
+                if (cfg.green1InYellow ? reach > rYa - cfg.clrGear : reach > cfg.green1OuterMax) continue;
+              }
               out.push({ m1, m2, zb, zg1, zg2, zy });
             }
           }
