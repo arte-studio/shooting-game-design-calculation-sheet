@@ -31,10 +31,11 @@
     ['green1InYellow', '緑1 も黄の歯先円内（二層時）', 'bool'],
     ['green1OuterMax', '緑1 最外点の上限半径', 'num'],
     ['grp', '配置探索 [mm]'],
+    ['clrPurpleP1', '紫円 ↔ P1 すき間', 'num'],
     ['redYRef', '赤 中心 y 基準', 'num'], ['redYTol', '赤 中心 y 許容 ±', 'num'],
     ['xbMin', '青 x 下限', 'num'], ['xbMax', '青 x 上限', 'num'], ['xbStep', '青 x 刻み', 'num'],
   ];
-  const STORE_KEY = 'gearsheet.cfg.v4';
+  const STORE_KEY = 'gearsheet.cfg.v5';
 
   function loadCfg() {
     let saved = {};

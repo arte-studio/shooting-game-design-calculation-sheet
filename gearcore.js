@@ -72,6 +72,7 @@
     xbStep: 1.0,
     redYRef: 3.15,          // 赤 中心 y の基準（図2・図4 の赤の現在位置 (39.1, 3.15)）
     redYTol: 8,             // 赤 中心 y の許容幅 ±（基準からの相対）
+    clrPurpleP1: 0,         // 紫円 ↔ P1（レバー）の最小すき間（被らなければよい）
     maxResults: 200000,
   };
 
@@ -151,6 +152,7 @@
     return (D[k] * (1 - tx) + D[k + 1] * tx) * (1 - ty) + (D[k + n] * (1 - tx) + D[k + n + 1] * tx) * ty;
   };
 
+  const P1POLY = PARTS.find((q) => q.id === 'P1').poly;
   let fieldCache = null;
   function getField() {
     if (!fieldCache) fieldCache = new DistField(PARTS, -95, 95, 0.25);
@@ -230,6 +232,9 @@
     const rR = D.R.da / 2, rB = D.B.da / 2;
     const rRmax = (cfg.brownD - cfg.purpleD) / 2;
     add('C3', '紫φ' + cfg.purpleD + ' ⊂ 茶φ' + cfg.brownD, rRmax - Math.hypot(P.R[0], P.R[1]), '|R| = ' + Math.hypot(P.R[0], P.R[1]).toFixed(3));
+    const p1 = PARTS.find((q) => q.id === 'P1');
+    const dPU = polyDist(P.R[0], P.R[1], p1.poly).d - cfg.purpleD / 2;
+    add('C8', '紫円 φ' + cfg.purpleD + ' ↔ P1 ' + p1.name, dPU - cfg.clrPurpleP1, 'すき間 ' + dPU.toFixed(3) + ' mm');
     add('C7a', '青 中心 x ≥ ' + cfg.xbMin, P.B[0] - cfg.xbMin, 'x = ' + P.B[0].toFixed(3));
     add('C7b', '赤 中心 y = ' + cfg.redYRef + ' ± ' + cfg.redYTol, cfg.redYTol - Math.abs(P.R[1] - cfg.redYRef), 'y = ' + P.R[1].toFixed(3));
 
@@ -286,7 +291,9 @@
     s = Math.min(s, Math.hypot(R[0] - B[0], R[1] - B[1]) - rR - blueObstacleR(cfg, D) - cfg.clrGear);
     if (cfg.checkCrossLayer) s = Math.min(s, D.Y.da / 2 - rn - rR - cfg.clrGear);
     if (s < 0) return s;
-    return Math.min(s, field.at(R[0], R[1]) - rR - cfg.clrPart);
+    s = Math.min(s, field.at(R[0], R[1]) - rR - cfg.clrPart);
+    if (s < 0) return s;
+    return Math.min(s, polyDistFast(R[0], R[1], P1POLY) - cfg.purpleD / 2 - cfg.clrPurpleP1);
   }
 
   // 赤の角度候補: |R| ≤ rmax かつ |R.y − yRef| ≤ yTol となる円弧上をサンプル
