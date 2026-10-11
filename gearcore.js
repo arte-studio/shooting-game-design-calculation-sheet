@@ -73,6 +73,8 @@
     redYRef: 3.15,          // 赤 中心 y の基準（図2・図4 の赤の現在位置 (39.1, 3.15)）
     redYTol: 8,             // 赤 中心 y の許容幅 ±（基準からの相対）
     clrPurpleP1: 0,         // 紫円 ↔ P1（レバー）の最小すき間（被らなければよい）
+    ballD: 27,              // 黄の中心にある球の直径。紫円と干渉させない
+    clrPurpleBall: 0.5,     // 紫円 ↔ 球 の最小すき間
     maxResults: 200000,
   };
 
@@ -235,6 +237,8 @@
     const p1 = PARTS.find((q) => q.id === 'P1');
     const dPU = polyDist(P.R[0], P.R[1], p1.poly).d - cfg.purpleD / 2;
     add('C8', '紫円 φ' + cfg.purpleD + ' ↔ P1 ' + p1.name, dPU - cfg.clrPurpleP1, 'すき間 ' + dPU.toFixed(3) + ' mm');
+    add('C9', '紫円 φ' + cfg.purpleD + ' ↔ 球 φ' + cfg.ballD, Math.hypot(P.R[0], P.R[1]) - (cfg.purpleD + cfg.ballD) / 2 - cfg.clrPurpleBall,
+      'すき間 ' + (Math.hypot(P.R[0], P.R[1]) - (cfg.purpleD + cfg.ballD) / 2).toFixed(3) + ' mm');
     add('C7a', '青 中心 x ≥ ' + cfg.xbMin, P.B[0] - cfg.xbMin, 'x = ' + P.B[0].toFixed(3));
     add('C7b', '赤 中心 y = ' + cfg.redYRef + ' ± ' + cfg.redYTol, cfg.redYTol - Math.abs(P.R[1] - cfg.redYRef), 'y = ' + P.R[1].toFixed(3));
 
@@ -288,6 +292,7 @@
   function slackR(cfg, D, field, R, B, rR) {
     const rn = Math.hypot(R[0], R[1]);
     let s = Math.min((cfg.brownD - cfg.purpleD) / 2 - rn, cfg.redYTol - Math.abs(R[1] - cfg.redYRef));
+    s = Math.min(s, rn - redRmin(cfg));
     s = Math.min(s, Math.hypot(R[0] - B[0], R[1] - B[1]) - rR - blueObstacleR(cfg, D) - cfg.clrGear);
     if (cfg.checkCrossLayer) s = Math.min(s, D.Y.da / 2 - rn - rR - cfg.clrGear);
     if (s < 0) return s;
@@ -296,8 +301,11 @@
     return Math.min(s, polyDistFast(R[0], R[1], P1POLY) - cfg.purpleD / 2 - cfg.clrPurpleP1);
   }
 
-  // 赤の角度候補: |R| ≤ rmax かつ |R.y − yRef| ≤ yTol となる円弧上をサンプル
-  function redAngles(G, aGR, rmax, n, yRef, yTol) {
+  // 赤中心の原点からの最小距離（紫円 ↔ 球）
+  function redRmin(cfg) { return (cfg.purpleD + cfg.ballD) / 2 + cfg.clrPurpleBall; }
+
+  // 赤の角度候補: rmin ≤ |R| ≤ rmax かつ |R.y − yRef| ≤ yTol となる円弧上をサンプル
+  function redAngles(G, aGR, rmax, n, yRef, yTol, rmin) {
     const g = Math.hypot(G[0], G[1]);
     const th0 = Math.atan2(-G[1], -G[0]);
     const c = (g * g + aGR * aGR - rmax * rmax) / (2 * g * aGR);
@@ -315,6 +323,27 @@
         if (h >= l) out.push([l, h]);
       }
       arcs = out;
+    }
+    if (rmin > 0) {
+      const c2 = (g * g + aGR * aGR - rmin * rmin) / (2 * g * aGR);
+      if (c2 < -1) return [];
+      if (c2 < 1) {
+        const w2 = Math.acos(c2), out = [];
+        for (const [l, h] of arcs) {
+          let segs = [[l, h]];
+          for (const k of [-2, -1, 0, 1, 2]) {
+            const el = th0 - w2 + 2 * Math.PI * k, eh = th0 + w2 + 2 * Math.PI * k, nx = [];
+            for (const [a, b] of segs) {
+              if (eh <= a || el >= b) { nx.push([a, b]); continue; }
+              if (el > a) nx.push([a, el]);
+              if (eh < b) nx.push([eh, b]);
+            }
+            segs = nx;
+          }
+          out.push(...segs);
+        }
+        arcs = out;
+      }
     }
     if (!arcs.length) return [];
     const total = arcs.reduce((t, [l, h]) => t + h - l, 0);
@@ -360,7 +389,7 @@
       const rR = (c.m1 * (zr + 2 * cfg.addendum)) / 2;
       let zrBest = null;
       for (const p of pick) {
-        for (const phi of redAngles(p.G, aGR, rmax, 13, cfg.redYRef, cfg.redYTol)) {
+        for (const phi of redAngles(p.G, aGR, rmax, 13, cfg.redYRef, cfg.redYTol, redRmin(cfg))) {
           const R = [p.G[0] + aGR * Math.cos(phi), p.G[1] + aGR * Math.sin(phi)];
           const s = Math.min(p.s, slackR(cfg, D, field, R, p.B, rR));
           if (s >= 0 && (!zrBest || s > zrBest.s)) zrBest = { s, xb: p.xb, branch: p.branch, phi };
@@ -485,7 +514,7 @@
         const B = [xb, cfg.blueY];
         const sb = slackBG(cfg, D, field, B, G);
         if (sb < best.v) continue;
-        for (const phi of redAngles(G, D.aGR, rmax, 37, cfg.redYRef, cfg.redYTol)) {
+        for (const phi of redAngles(G, D.aGR, rmax, 37, cfg.redYRef, cfg.redYTol, redRmin(cfg))) {
           const R = [G[0] + D.aGR * Math.cos(phi), G[1] + D.aGR * Math.sin(phi)];
           const v = Math.min(sb, slackR(cfg, D, field, R, B, rR));
           if (v > best.v) { const pl = { xb, branch: br, phi }; const ve = score(pl); if (ve > best.v) best = { pl, v: ve }; }

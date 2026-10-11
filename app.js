@@ -31,11 +31,11 @@
     ['green1InYellow', '緑1 も黄の歯先円内（二層時）', 'bool'],
     ['green1OuterMax', '緑1 最外点の上限半径', 'num'],
     ['grp', '配置探索 [mm]'],
-    ['clrPurpleP1', '紫円 ↔ P1 すき間', 'num'],
+    ['clrPurpleP1', '紫円 ↔ P1 すき間', 'num'], ['ballD', '球 直径（黄の中心）', 'num'], ['clrPurpleBall', '紫円 ↔ 球 すき間', 'num'],
     ['redYRef', '赤 中心 y 基準', 'num'], ['redYTol', '赤 中心 y 許容 ±', 'num'],
     ['xbMin', '青 x 下限', 'num'], ['xbMax', '青 x 上限', 'num'], ['xbStep', '青 x 刻み', 'num'],
   ];
-  const STORE_KEY = 'gearsheet.cfg.v5';
+  const STORE_KEY = 'gearsheet.cfg.v7';
 
   function loadCfg() {
     let saved = {};
@@ -275,6 +275,7 @@
     }
     if (P && D.layered) shapes.push({ kind: 'circle', id: 'B.shaft', name: '青 軸', c: P.B, r: cfg.blueShaftD / 2, color: 'var(--blue)', width: 1, dash: '', info: ['二層時は赤の歯先円とこの軸で干渉判定'] });
     shapes.push({ kind: 'circle', id: 'BR', name: '茶円', c: [0, 0], r: cfg.brownD / 2, color: 'var(--brown)', width: 1.5, dash: '', info: ['黄と同心'] });
+    shapes.push({ kind: 'circle', id: 'BL', name: '球', c: [0, 0], r: cfg.ballD / 2, color: 'var(--brown)', width: 1.5, dash: '', info: ['黄の中心にある球（投影）'] });
     if (P) shapes.push({ kind: 'circle', id: 'PU', name: '紫円', c: P.R, r: cfg.purpleD / 2, color: 'var(--purple)', width: 1.5, dash: '', info: ['赤と同心'] });
     for (const part of GC.PARTS) {
       shapes.push({ kind: 'poly', id: part.id, name: part.name, pts: part.poly, color: 'var(--part)' });
