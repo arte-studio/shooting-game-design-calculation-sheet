@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>歯車列 設計計算シート</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -18,7 +18,7 @@
     <details open>
       <summary>条件</summary>
       <form id="cfgForm" class="cfg"></form>
-      <div class="row">
+      <div class="row runBar">
         <button id="btnRun" type="button">探索実行</button>
         <button id="btnReset" type="button" class="ghost">既定値に戻す</button>
       </div>
@@ -54,6 +54,7 @@
       <label><input type="checkbox" id="showTip" checked> 歯先円</label>
       <label><input type="checkbox" id="showRoot"> 歯底円</label>
       <label><input type="checkbox" id="showLabels" checked> ラベル</label>
+      <label title="タップ / クリックで計測点を置く"><input type="checkbox" id="measMode"> 計測モード</label>
       <button id="btnFit" class="ghost">全体表示</button>
       <button id="btnClearMeas" class="ghost">計測クリア</button>
     </div>
@@ -61,7 +62,7 @@
       <svg id="view"></svg>
       <div id="tooltip"></div>
     </div>
-    <div class="status"><span id="cursorPos">x: – y: –</span><span class="hint">ホイール: ズーム / ドラッグ: 移動 / 右クリック×2: 2点間距離 (Shift で吸着なし, Esc で取消)</span></div>
+    <div class="status"><span id="cursorPos">x: – y: –</span><span class="hint pc">ホイール: ズーム / ドラッグ: 移動 / 右クリック×2: 2点間距離 (Shift で吸着なし, Esc で取消)</span><span class="hint touch">ピンチ: ズーム / ドラッグ: 移動 / タップ: 情報 / 長押し×2 または 計測モード: 2点間距離</span></div>
   </section>
 
   <!-- 右: 詳細 -->
@@ -81,6 +82,13 @@
     </details>
   </section>
 </main>
+
+<!-- スマホ用タブ -->
+<nav id="tabs">
+  <button type="button" data-tab="left">条件・結果</button>
+  <button type="button" data-tab="center">図</button>
+  <button type="button" data-tab="right">詳細</button>
+</nav>
 
 <script src="gearcore.js"></script>
 <script src="app.js"></script>

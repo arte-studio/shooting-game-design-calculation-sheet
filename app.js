@@ -122,6 +122,8 @@
         fillFilterOptions();
         applyView();
         if (state.view.length) selectResult(state.view[0]);
+        // スマホ: 長い条件フォームの下にある結果表へ移動
+        if (matchMedia('(max-width: 760px)').matches) $('#resTable').closest('details').scrollIntoView({ behavior: 'smooth' });
       };
       tick();
     }, 30);
@@ -169,6 +171,12 @@
       return `<tr data-i="${state.page * pp + i}"${sel}><td>${r.m1}</td><td>${r.m2}</td><td>${r.zr}${zrRange}</td><td>${r.zb}</td><td>${r.zg1}</td><td>${r.zg2}</td><td>${r.zy}</td>` +
         `<td>${r.layered ? '二層' : '一層'}</td><td>${f3(r.ratioErrPct)}</td><td>${f2(r.yellowDf)}</td><td>${f2(r.score)}</td></tr>`;
     }).join('') || '<tr><td colspan="11" class="muted" style="text-align:center">探索実行で結果を表示</td></tr>';
+  }
+
+  function setTab(t) {
+    document.body.dataset.tab = t;
+    for (const b of document.querySelectorAll('#tabs button')) b.classList.toggle('on', b.dataset.tab === t);
+    if (t === 'center') { if (state.needFit) fit(); else draw(); }
   }
 
   function selectResult(r) {
@@ -295,6 +303,8 @@
 
   function fit() {
     const [W, H] = size();
+    state.needFit = !(W > 0 && H > 0);   // 非表示中（スマホのタブ切替前）は表示時に合わせ直す
+    if (state.needFit) return;
     const r = state.ev ? state.ev.D.Y.df / 2 + 4 : 90;
     state.vp = { cx: 0, cy: 0, k: Math.min(W, H) / (2 * r) };
     draw();
@@ -375,15 +385,15 @@
     for (const sh of state.shapes) {
       if (sh.kind === 'point') {
         const d = Math.hypot(sh.p[0] - w[0], sh.p[1] - w[1]) * k;
-        if (d <= 8) consider({ shape: sh, type: 'point', p: sh.p }, d, 0);
+        if (d <= 8 * hitScale) consider({ shape: sh, type: 'point', p: sh.p }, d, 0);
       } else if (sh.kind === 'circle') {
         const dx = w[0] - sh.c[0], dy = w[1] - sh.c[1], rr = Math.hypot(dx, dy) || 1e-9;
         const d = Math.abs(rr - sh.r) * k;
-        if (d <= 6) consider({ shape: sh, type: 'edge', p: [sh.c[0] + (dx / rr) * sh.r, sh.c[1] + (dy / rr) * sh.r] }, d, 1);
+        if (d <= 6 * hitScale) consider({ shape: sh, type: 'edge', p: [sh.c[0] + (dx / rr) * sh.r, sh.c[1] + (dy / rr) * sh.r] }, d, 1);
       } else if (sh.kind === 'poly') {
         const pd = GC.polyDist(w[0], w[1], sh.pts);
         const d = Math.abs(pd.d) * k;
-        if (d <= 6) consider({ shape: sh, type: 'edge', p: [pd.qx, pd.qy] }, d, 1);
+        if (d <= 6 * hitScale) consider({ shape: sh, type: 'edge', p: [pd.qx, pd.qy] }, d, 1);
         else if (pd.d < 0) consider({ shape: sh, type: 'inside', p: w }, 0, 2);
       }
     }
@@ -411,62 +421,157 @@
   }
 
   // ---------------------------------------------------------------------------
-  // マウス操作
+  // マウス・タッチ操作
   // ---------------------------------------------------------------------------
   const tip = $('#tooltip');
-  let drag = null;
+  const pts = new Map();     // 押下中のポインタ（タッチのピンチ用）
+  let drag = null, pinch = null, press = null, lastTouch = 0;
 
   function localXY(e) { const r = svg.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
 
+  // 吸着・ホバーの許容幅はタッチで広げる
+  let hitScale = 1;
+  function hitAt(sx, sy, touch) { hitScale = touch ? 2.5 : 1; const h = hitTest(sx, sy); hitScale = 1; return h; }
+
+  function showTip(h, sx, sy) {
+    if (!h) { tip.style.display = 'none'; return; }
+    tip.innerHTML = tooltipHtml(h);
+    tip.style.display = 'block';
+    const wrap = svg.getBoundingClientRect();
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    tip.style.left = Math.max(4, Math.min(sx + 14, wrap.width - tw - 4)) + 'px';
+    tip.style.top = Math.max(4, sy + 14 + th > wrap.height ? sy - th - 10 : sy + 14) + 'px';
+  }
+
+  function setCursor(w, p) {
+    state.cursor = { p };
+    $('#cursorPos').textContent = `x: ${f3(w[0])}　y: ${f3(w[1])}` + (state.measA ? `　計測中: L = ${f3(Math.hypot(p[0] - state.measA[0], p[1] - state.measA[1]))}` : '');
+  }
+
+  // 計測点の追加（右クリック・長押し・計測モードのタップ）
+  function addMeasPoint(sx, sy, noSnap, touch) {
+    const h = noSnap ? null : hitAt(sx, sy, touch);
+    const p = h && h.type !== 'inside' ? h.p.slice() : toW(sx, sy);
+    if (!state.measA) state.measA = p;
+    else if (Math.hypot(p[0] - state.measA[0], p[1] - state.measA[1]) > 1e-9) { state.meas.push({ a: state.measA, b: p }); state.measA = null; }
+    setCursor(p, p);
+    draw();
+  }
+
+  function zoomAt(sx, sy, f) {
+    const w = toW(sx, sy);
+    state.vp.k = Math.min(400, Math.max(0.5, state.vp.k * f));
+    const w2 = toW(sx, sy);
+    state.vp.cx += w[0] - w2[0]; state.vp.cy += w[1] - w2[1];
+  }
+
+  const measMode = () => $('#measMode').checked;
+
   svg.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0) return;
-    drag = { x: e.clientX, y: e.clientY, cx: state.vp.cx, cy: state.vp.cy };
+    const touch = e.pointerType !== 'mouse';
+    if (touch) lastTouch = Date.now();
+    if (!touch && e.button !== 0) return;
     svg.setPointerCapture(e.pointerId);
+    const [sx, sy] = localXY(e);
+    pts.set(e.pointerId, [sx, sy]);
+    if (pts.size === 2) {
+      // ピンチ開始: ドラッグ・タップ・長押しを取り消し
+      clearTimeout(press && press.timer); press = null; drag = null;
+      const [p1, p2] = [...pts.values()];
+      pinch = { d: Math.hypot(p1[0] - p2[0], p1[1] - p2[1]) || 1, m: [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2] };
+      return;
+    }
+    if (pts.size > 2) return;
+    drag = { x: e.clientX, y: e.clientY, cx: state.vp.cx, cy: state.vp.cy, moved: false };
+    press = { sx, sy, touch, shift: e.shiftKey, long: false, timer: null };
+    if (touch) {
+      press.timer = setTimeout(() => {
+        // 長押し = 右クリック相当（計測点）
+        if (!press || drag.moved) return;
+        press.long = true;
+        if (navigator.vibrate) navigator.vibrate(15);
+        addMeasPoint(sx, sy, false, true);
+      }, 500);
+    }
   });
-  svg.addEventListener('pointerup', () => { drag = null; });
+
+  function endPointer(e) {
+    pts.delete(e.pointerId);
+    if (pinch) { if (pts.size < 2) pinch = null; drag = null; press = null; return; }
+    if (press) {
+      clearTimeout(press.timer);
+      if (!press.long && drag && !drag.moved) {
+        // タップ / クリック
+        if (measMode()) addMeasPoint(press.sx, press.sy, press.shift, press.touch);
+        else if (press.touch) {
+          const h = hitAt(press.sx, press.sy, true);
+          state.hover = h;
+          setCursor(toW(press.sx, press.sy), h && h.type !== 'inside' ? h.p : toW(press.sx, press.sy));
+          showTip(h, press.sx, press.sy);
+          draw();
+        }
+      }
+    }
+    press = null; drag = null;
+  }
+  svg.addEventListener('pointerup', endPointer);
+  svg.addEventListener('pointercancel', endPointer);
+
   svg.addEventListener('pointermove', (e) => {
     const [sx, sy] = localXY(e);
+    const touch = e.pointerType !== 'mouse';
+    if (pts.has(e.pointerId)) pts.set(e.pointerId, [sx, sy]);
+    if (pinch && pts.size >= 2) {
+      const [p1, p2] = [...pts.values()];
+      const d = Math.hypot(p1[0] - p2[0], p1[1] - p2[1]) || 1, m = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+      state.vp.cx -= (m[0] - pinch.m[0]) / state.vp.k;
+      state.vp.cy += (m[1] - pinch.m[1]) / state.vp.k;
+      zoomAt(m[0], m[1], d / pinch.d);
+      pinch = { d, m };
+      tip.style.display = 'none';
+      draw();
+      return;
+    }
     if (drag) {
-      state.vp.cx = drag.cx - (e.clientX - drag.x) / state.vp.k;
-      state.vp.cy = drag.cy + (e.clientY - drag.y) / state.vp.k;
+      if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > (touch ? 8 : 3)) {
+        drag.moved = true;
+        if (press) clearTimeout(press.timer);
+      }
+      if (drag.moved) {
+        state.vp.cx = drag.cx - (e.clientX - drag.x) / state.vp.k;
+        state.vp.cy = drag.cy + (e.clientY - drag.y) / state.vp.k;
+      }
+    }
+    if (touch) {
+      // タッチはホバーなし（タップで表示）。ドラッグ中はツールチップを隠す
+      if (drag && drag.moved) { tip.style.display = 'none'; state.hover = null; draw(); }
+      return;
     }
     const w = toW(sx, sy);
-    const h = drag ? null : hitTest(sx, sy);
+    const h = drag && drag.moved ? null : hitTest(sx, sy);
     state.hover = h;
-    state.cursor = { p: !e.shiftKey && h && h.type !== 'inside' ? h.p : w };
-    $('#cursorPos').textContent = `x: ${f3(w[0])}　y: ${f3(w[1])}` + (state.measA ? `　計測中: L = ${f3(Math.hypot(state.cursor.p[0] - state.measA[0], state.cursor.p[1] - state.measA[1]))}` : '');
-    if (h) {
-      tip.innerHTML = tooltipHtml(h);
-      tip.style.display = 'block';
-      const wrap = svg.getBoundingClientRect();
-      const tw = tip.offsetWidth, th = tip.offsetHeight;
-      tip.style.left = Math.min(sx + 14, wrap.width - tw - 4) + 'px';
-      tip.style.top = (sy + 14 + th > wrap.height ? sy - th - 10 : sy + 14) + 'px';
-    } else tip.style.display = 'none';
+    setCursor(w, !e.shiftKey && h && h.type !== 'inside' ? h.p : w);
+    showTip(h, sx, sy);
     draw();
   });
-  svg.addEventListener('pointerleave', () => { state.hover = null; tip.style.display = 'none'; draw(); });
+  svg.addEventListener('pointerleave', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    state.hover = null; tip.style.display = 'none'; draw();
+  });
 
   svg.addEventListener('wheel', (e) => {
     e.preventDefault();
     const [sx, sy] = localXY(e);
-    const w = toW(sx, sy);
-    const f = Math.exp(-e.deltaY * 0.0015);
-    state.vp.k = Math.min(400, Math.max(0.5, state.vp.k * f));
-    const w2 = toW(sx, sy);
-    state.vp.cx += w[0] - w2[0]; state.vp.cy += w[1] - w2[1];
+    zoomAt(sx, sy, Math.exp(-e.deltaY * 0.0015));
     draw();
   }, { passive: false });
 
-  // 右クリック: 2 点間距離
+  // 右クリック: 2 点間距離（タッチ由来の contextmenu は長押しで処理済みなので無視）
   svg.addEventListener('contextmenu', (e) => {
     e.preventDefault();
+    if (Date.now() - lastTouch < 1500) return;
     const [sx, sy] = localXY(e);
-    const h = e.shiftKey ? null : hitTest(sx, sy);
-    const p = h && h.type !== 'inside' ? h.p.slice() : toW(sx, sy);
-    if (!state.measA) state.measA = p;
-    else if (Math.hypot(p[0] - state.measA[0], p[1] - state.measA[1]) > 1e-9) { state.meas.push({ a: state.measA, b: p }); state.measA = null; }
-    draw();
+    addMeasPoint(sx, sy, e.shiftKey, false);
   });
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { state.measA = null; draw(); }
@@ -486,6 +591,9 @@
     $('#btnReset').onclick = () => { state.cfg = Object.assign({}, GC.DEFAULTS); saveCfg(state.cfg); buildForm(state.cfg); };
     $('#btnFit').onclick = fit;
     $('#btnClearMeas').onclick = () => { state.meas = []; state.measA = null; draw(); };
+    // スマホ: 下部タブで 条件・結果 / 図 / 詳細 を切替
+    for (const b of document.querySelectorAll('#tabs button')) b.onclick = () => setTab(b.dataset.tab);
+    setTab('left');
     for (const id of ['#bgSel', '#bgOp']) $(id).oninput = draw;
     for (const id of ['#showTip', '#showRoot', '#showLabels']) $(id).onchange = () => { buildScene(); draw(); };
     for (const id of ['#fM1', '#fM2', '#fLayer']) $(id).onchange = () => { state.page = 0; applyView(); };
@@ -496,7 +604,11 @@
         applyView();
       };
     }
-    $('#resTable tbody').onclick = (e) => { const tr = e.target.closest('tr[data-i]'); if (tr) selectResult(state.view[+tr.dataset.i]); };
+    $('#resTable tbody').onclick = (e) => { const tr = e.target.closest('tr[data-i]'); if (!tr) return;
+      // スマホでは行を選ぶと図タブへ
+      if (matchMedia('(max-width: 760px)').matches) setTab('center');
+      selectResult(state.view[+tr.dataset.i]);
+    };
     $('#pgPrev').onclick = () => { state.page = Math.max(0, state.page - 1); renderTable(); };
     $('#pgNext').onclick = () => { state.page++; renderTable(); };
 
