@@ -32,6 +32,7 @@ body {
 header { padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel); display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
 header h1 { font-size: 16px; margin: 0; }
 .sub { color: var(--muted); }
+.ver { margin-left: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; border: 1px solid var(--line); border-radius: 9px; padding: 0 8px; }
 
 main { flex: 1; display: grid; grid-template-columns: 360px 1fr 340px; min-height: 0; }
 section { min-height: 0; overflow: auto; }
@@ -116,6 +117,8 @@ td.ok { color: var(--ok); } td.ng { color: var(--ng); font-weight: 600; }
   summary { font-size: 17px; padding: 6px 0; }
   header { padding: 6px 16px; gap: 4px 12px; }
   header h1 { font-size: 18px; }
+  header { position: relative; }
+  .ver { position: absolute; right: 16px; top: 9px; font-size: 13px; }
   header .sub { font-size: 14px; }
   main { display: block; flex: 1; min-height: 0; overflow: hidden; }
   #left, #center, #right { display: none; height: 100%; }
