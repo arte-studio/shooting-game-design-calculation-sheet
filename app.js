@@ -31,11 +31,11 @@
     ['green1InYellow', '緑1 も黄の歯先円内（二層時）', 'bool'],
     ['green1OuterMax', '緑1 最外点の上限半径', 'num'],
     ['grp', '配置探索 [mm]'],
-    ['clrPurpleP1', '紫円 ↔ P1 すき間', 'num'], ['ballD', '球 直径（黄の中心）', 'num'], ['clrPurpleBall', '紫円 ↔ 球 すき間', 'num'],
+    ['clrPurplePart', '紫円 ↔ P1・P3 すき間', 'num'], ['ballD', '球 直径（黄の中心）', 'num'], ['clrPurpleBall', '紫円 ↔ 球 すき間', 'num'],
     ['redYRef', '赤 中心 y 基準', 'num'], ['redYTol', '赤 中心 y 許容 ±', 'num'],
     ['xbMin', '青 x 下限', 'num'], ['xbMax', '青 x 上限', 'num'], ['xbStep', '青 x 刻み', 'num'],
   ];
-  const STORE_KEY = 'gearsheet.cfg.v7';
+  const STORE_KEY = 'gearsheet.cfg.v8';
 
   function loadCfg() {
     let saved = {};
@@ -286,7 +286,7 @@
     shapes.push({ kind: 'circle', id: 'BL', name: '球', c: [0, 0], r: cfg.ballD / 2, color: 'var(--brown)', width: 1.5, dash: '', info: ['黄の中心にある球（投影）'] });
     if (P) shapes.push({ kind: 'circle', id: 'PU', name: '紫円', c: P.R, r: cfg.purpleD / 2, color: 'var(--purple)', width: 1.5, dash: '', info: ['赤と同心'] });
     for (const part of GC.PARTS) {
-      shapes.push({ kind: 'poly', id: part.id, name: part.name, pts: part.poly, color: 'var(--part)' });
+      shapes.push({ kind: 'poly', id: part.id, name: part.name, pts: part.poly, color: 'var(--part)', info: part.purpleOnly ? ['紫円（モーター）とだけ干渉判定'] : [] });
       part.poly.forEach((p, i) => shapes.push({ kind: 'point', id: `${part.id}.v${i}`, name: part.name + ' 頂点', p, color: 'var(--part)', draw: false }));
     }
     shapes.push({ kind: 'hline', id: 'L.by', name: '青中心 y', y: cfg.blueY, color: 'var(--muted)' });
@@ -339,7 +339,7 @@
     // 背景画像
     const bg = $('#bgSel').value;
     if (bg) {
-      const F = GC.FIGURES[bg], S = GC.PX_PER_MM;
+      const F = GC.FIGURES[bg], S = F.s || GC.PX_PER_MM;
       const [x0, y0] = toS([-F.cx / S, F.cy / S]);
       out.push(`<image href="${F.src}" x="${x0}" y="${y0}" width="${(F.w / S) * state.vp.k}" height="${(F.h / S) * state.vp.k}" opacity="${$('#bgOp').value}" preserveAspectRatio="none"/>`);
     }
@@ -411,6 +411,7 @@
       lines.push(`円周上の点 (${f3(p[0])}, ${f3(p[1])})`);
     }
     if (sh.kind === 'poly') {
+      lines.push(...(sh.info || []));
       const xs = sh.pts.map((q) => q[0]), ys = sh.pts.map((q) => q[1]);
       const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
       lines.push(`外形 ${f3(x1 - x0)} × ${f3(y1 - y0)}`);

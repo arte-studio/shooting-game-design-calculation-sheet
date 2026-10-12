@@ -26,13 +26,25 @@
       id: 'P2', name: '水色部品（箱）',
       poly: [[10.09, -32.11], [10.09, -42.18], [20.15, -42.18], [20.15, -32.11]],
     },
+    {
+      // 図5 の上部の水色部品。モーター（紫円）とだけ干渉判定する（歯車とは別の面）
+      // 左右対称とし, 下側の凹円弧は原点中心 R15.75 で近似（図5 から抽出, 精度 ±0.3 mm 程度）
+      id: 'P3', name: '水色部品（上部ブロック）', purpleOnly: true,
+      poly: [[-23.1, 45.33], [23.1, 45.33], [23.1, 36.77], [18.1, 36.77], [16.2, 34.9], [16.2, 4.68], [15.04, 4.68], [13.95, 7.31], [12.4, 9.71], [10.45, 11.79], [8.15, 13.48], [5.59, 14.73], [2.84, 15.49], [0.0, 15.75], [-2.84, 15.49], [-5.59, 14.73], [-8.15, 13.48], [-10.45, 11.79], [-12.4, 9.71], [-13.95, 7.31], [-15.04, 4.68], [-16.2, 4.68], [-16.2, 34.9], [-18.1, 36.77], [-23.1, 36.77]],
+    },
   ];
+
+  // 歯車の歯先円と干渉判定する部品 / 紫円（モーター）と干渉判定する部品
+  const GEAR_PARTS = PARTS.filter((q) => !q.purpleOnly);
+  const PURPLE_PARTS = PARTS.filter((q) => q.purpleOnly || q.id === 'P1');
 
   // 背景画像の配置（画像ピクセル → mm）: x = (px - cx)/S, y = -(py - cy)/S
   const FIGURES = {
     fig3: { src: 'figures/fig3_cad_front.png', w: 1614, h: 1210, cx: 808.4, cy: 605.0, label: '図3 CAD正面図' },
     fig2: { src: 'figures/fig2_failed_layout.png', w: 1306, h: 1242, cx: 653.1, cy: 621.2, label: '図2 不成立配置' },
     fig4: { src: 'figures/fig4_red_layout.png', w: 1306, h: 1242, cx: 653.1, cy: 621.2, label: '図4 赤の配置' },
+    // 図5 は縮尺が異なる（図3 との画像相関で位置合わせ: 4.674 px/mm）
+    fig5: { src: 'figures/fig5_motor_part.png', w: 955, h: 896, cx: 469.39, cy: 443.37, s: 4.6741, label: '図5 上部の水色部品' },
   };
 
   // 図2 の配置（参考, 読み取り値）
@@ -72,7 +84,7 @@
     xbStep: 1.0,
     redYRef: 3.15,          // 赤 中心 y の基準（図2・図4 の赤の現在位置 (39.1, 3.15)）
     redYTol: 8,             // 赤 中心 y の許容幅 ±（基準からの相対）
-    clrPurpleP1: 0,         // 紫円 ↔ P1（レバー）の最小すき間（被らなければよい）
+    clrPurplePart: 0,       // 紫円 ↔ P1（レバー）・P3（上部ブロック）の最小すき間（被らなければよい）
     ballD: 27,              // 黄の中心にある球の直径。紫円と干渉させない
     clrPurpleBall: 0.5,     // 紫円 ↔ 球 の最小すき間
     maxResults: 200000,
@@ -154,10 +166,9 @@
     return (D[k] * (1 - tx) + D[k + 1] * tx) * (1 - ty) + (D[k + n] * (1 - tx) + D[k + n + 1] * tx) * ty;
   };
 
-  const P1POLY = PARTS.find((q) => q.id === 'P1').poly;
   let fieldCache = null;
   function getField() {
-    if (!fieldCache) fieldCache = new DistField(PARTS, -95, 95, 0.25);
+    if (!fieldCache) fieldCache = new DistField(GEAR_PARTS, -95, 95, 0.25);
     return fieldCache;
   }
 
@@ -234,9 +245,10 @@
     const rR = D.R.da / 2, rB = D.B.da / 2;
     const rRmax = (cfg.brownD - cfg.purpleD) / 2;
     add('C3', '紫φ' + cfg.purpleD + ' ⊂ 茶φ' + cfg.brownD, rRmax - Math.hypot(P.R[0], P.R[1]), '|R| = ' + Math.hypot(P.R[0], P.R[1]).toFixed(3));
-    const p1 = PARTS.find((q) => q.id === 'P1');
-    const dPU = polyDist(P.R[0], P.R[1], p1.poly).d - cfg.purpleD / 2;
-    add('C8', '紫円 φ' + cfg.purpleD + ' ↔ P1 ' + p1.name, dPU - cfg.clrPurpleP1, 'すき間 ' + dPU.toFixed(3) + ' mm');
+    for (const part of PURPLE_PARTS) {
+      const dPU = polyDist(P.R[0], P.R[1], part.poly).d - cfg.purpleD / 2;
+      add('C8', '紫円 φ' + cfg.purpleD + ' ↔ ' + part.id + ' ' + part.name, dPU - cfg.clrPurplePart, 'すき間 ' + dPU.toFixed(3) + ' mm');
+    }
     add('C9', '紫円 φ' + cfg.purpleD + ' ↔ 球 φ' + cfg.ballD, Math.hypot(P.R[0], P.R[1]) - (cfg.purpleD + cfg.ballD) / 2 - cfg.clrPurpleBall,
       'すき間 ' + (Math.hypot(P.R[0], P.R[1]) - (cfg.purpleD + cfg.ballD) / 2).toFixed(3) + ' mm');
     add('C7a', '青 中心 x ≥ ' + cfg.xbMin, P.B[0] - cfg.xbMin, 'x = ' + P.B[0].toFixed(3));
@@ -245,7 +257,7 @@
     const gearsVsParts = [['R', '赤', P.R, rR], ['B', '青', P.B, rB], ['G1', '緑(一層目)', P.G, D.G1.da / 2]];
     if (D.layered) gearsVsParts.push(['G2', '緑(二層目)', P.G, D.G2.da / 2]);
     for (const [gid, gname, c, r] of gearsVsParts) {
-      for (const part of PARTS) {
+      for (const part of GEAR_PARTS) {
         const pd = polyDist(c[0], c[1], part.poly);
         add('C4', gname + '歯先円 ↔ ' + part.id + ' ' + part.name, pd.d - r - cfg.clrPart,
           'すき間 ' + (pd.d - r).toFixed(3) + ' mm');
@@ -298,7 +310,8 @@
     if (s < 0) return s;
     s = Math.min(s, field.at(R[0], R[1]) - rR - cfg.clrPart);
     if (s < 0) return s;
-    return Math.min(s, polyDistFast(R[0], R[1], P1POLY) - cfg.purpleD / 2 - cfg.clrPurpleP1);
+    for (const part of PURPLE_PARTS) s = Math.min(s, polyDistFast(R[0], R[1], part.poly) - cfg.purpleD / 2 - cfg.clrPurplePart);
+    return s;
   }
 
   // 赤中心の原点からの最小距離（紫円 ↔ 球）
