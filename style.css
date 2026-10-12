@@ -112,10 +112,11 @@ td.ok { color: var(--ok); } td.ng { color: var(--ng); font-weight: 600; }
 }
 #tabs { display: none; }
 @media (max-width: 760px) {
-  body { height: 100dvh; }
+  body { height: 100dvh; font-size: 16px; line-height: 1.5; }
+  summary { font-size: 17px; padding: 6px 0; }
   header { padding: 6px 16px; gap: 4px 12px; }
-  header h1 { font-size: 15px; }
-  header .sub { font-size: 12px; }
+  header h1 { font-size: 18px; }
+  header .sub { font-size: 14px; }
   main { display: block; flex: 1; min-height: 0; overflow: hidden; }
   #left, #center, #right { display: none; height: 100%; }
   body[data-tab="left"] #left, body[data-tab="right"] #right { display: block; overflow: auto; }
@@ -131,11 +132,16 @@ td.ok { color: var(--ok); } td.ng { color: var(--ng); font-weight: 600; }
   th, td { padding: 6px 6px; }
   table.small { display: block; overflow-x: auto; }
   table.small td:first-child { white-space: normal; min-width: 8em; }
-  .toolbar { padding: 6px 8px; gap: 6px 10px; font-size: 13px; }
+  .toolbar { padding: 6px 8px; gap: 6px 10px; font-size: 15px; }
+  .toolbar input[type=checkbox] { width: 18px; height: 18px; vertical-align: -3px; }
   .toolbar input[type=range] { width: 80px; }
-  .status { font-size: 12px; }
+  .status { font-size: 15px; }
+  .progress { height: 22px; }
+  .progress span { font-size: 13px; line-height: 22px; }
+  .badge { font-size: 13px; }
+  #view .lbl { font-size: 15px; stroke-width: 4px; }
   .status .hint { display: none; }
-  #tooltip { white-space: normal; max-width: calc(100% - 8px); }
+  #tooltip { white-space: normal; max-width: calc(100% - 8px); font-size: 15px; padding: 8px 10px; }
   .placeCtl { grid-template-columns: 56px 1fr 80px; }
   #tabs {
     display: flex; border-top: 1px solid var(--line); background: var(--panel);
@@ -143,7 +149,7 @@ td.ok { color: var(--ok); } td.ng { color: var(--ng); font-weight: 600; }
   }
   #tabs button {
     flex: 1; background: transparent; color: var(--muted); border: 0; border-radius: 0;
-    padding: 10px 0; font-size: 14px; border-top: 2px solid transparent;
+    padding: 12px 0; font-size: 16px; border-top: 2px solid transparent;
   }
   #tabs button.on { color: var(--accent); border-top-color: var(--accent); font-weight: 600; }
 }
