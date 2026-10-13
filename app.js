@@ -22,7 +22,7 @@
     ['grp', 'かみ合い干渉・転位（選んだ解の詳細に反映。探索の候補は弾かない）'],
     ['shiftMode', '転位', 'sel', null, [['none', 'なし（標準）'], ['auto', '自動（干渉しない最小）'], ['manual', '手動']]],
     ['xRB', '赤・青 の転位 +x（緑1 は −x）', 'num', 'shiftMode=manual'], ['xG2', '緑2・黄 の転位 +x', 'num', 'shiftMode=manual'],
-    ['tipMinM', '歯先厚さ 目安下限 [×m]', 'num'], ['tipMinMM', '歯先厚さ 目安下限 [mm]', 'num'], ['epsMin', 'かみ合い率 目安下限', 'num'],
+    ['tipMinM', '歯先厚さ 目安下限（m の倍数）', 'num'], ['tipMinMM', '歯先厚さ 目安下限 [mm]', 'num'], ['epsMin', 'かみ合い率 目安下限', 'num'],
     ['grp', '歯数'],
     ['zMin', '最小歯数', 'int'], ['zMaxRed', '赤 最大', 'int'], ['zMaxBlue', '青 最大', 'int'], ['zMaxGreen', '緑 最大', 'int'],
     ['internalMinDiff', '黄 − 緑二層目 最小差', 'int'],
@@ -43,6 +43,16 @@
     ['redXRef', '赤 現在位置 x（移動量の基準）', 'num'], ['redYRef', '赤 中心 y 基準（現在位置 y）', 'num'], ['redYTol', '赤 中心 y 許容 ±', 'num'],
     ['xbMin', '青 x 下限', 'num'], ['xbMax', '青 x 上限', 'num'], ['xbStep', '青 x 刻み', 'num'],
   ];
+  // 条件欄の項目にカーソルを当てたときの説明
+  const FIELD_TIPS = {
+    shiftMode: '高低転位: 外歯車対は小歯車 +x・相手 −x，内歯車対は緑2・黄とも +x（中心距離は不変）。x は転位係数（無次元），転位量 = x × m [mm]',
+    xRB: '転位係数 x（無次元）。赤・青に +x，緑一層目に −x。転位量 = x × m1 [mm]',
+    xG2: '転位係数 x（無次元）。緑二層目・黄に +x。転位量 = x × m2 [mm]',
+    tipMinM: 'モジュールに対する倍率。例: 0.25 なら m = 1.6 で 0.25 × 1.6 = 0.4 mm。下の [mm] の値と大きい方を目安にする',
+    tipMinMM: '歯先厚さの目安下限 [mm]。FDM ではノズル径 0.4 mm × 2 本分 = 0.8 mm 程度',
+    epsMin: 'かみ合い率 = 同時にかみ合う歯の組数の平均。1.2 以上が目安',
+  };
+
   const STORE_KEY = 'gearsheet.cfg.v16';
 
   function loadCfg() {
@@ -61,10 +71,12 @@
     for (const [k, label, type, dep, opts] of FIELDS) {
       if (k === 'grp') { const d = document.createElement('div'); d.className = 'grp'; d.textContent = label; form.appendChild(d); continue; }
       const lab = document.createElement('label'); lab.textContent = label; lab.htmlFor = 'cf_' + k;
+      if (FIELD_TIPS[k]) lab.title = FIELD_TIPS[k];
       const inp = document.createElement(type === 'sel' ? 'select' : 'input'); inp.id = 'cf_' + k; inp.dataset.k = k; inp.dataset.t = type;
       if (type === 'sel') { inp.innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join(''); inp.value = cfg[k]; }
       else if (type === 'bool') { inp.type = 'checkbox'; inp.checked = !!cfg[k]; }
       else { inp.type = 'number'; inp.step = type === 'int' ? '1' : 'any'; inp.value = cfg[k]; }
+      if (FIELD_TIPS[k]) inp.title = FIELD_TIPS[k];
       if (dep) { lab.classList.add('sub'); deps.push([dep, lab, inp]); }
       form.appendChild(lab); form.appendChild(inp);
     }
@@ -318,8 +330,8 @@
       const t = MR.tips[id];
       return `<td class="${t.ok ? '' : 'ng'}" title="目安 ${f2(t.lim)} mm 以上">${isNaN(t.t) ? '–' : f2(t.t)}</td>`;
     };
-    $('#gearTable').innerHTML = '<tr><th>ID</th><th>m</th><th>z</th><th>x</th><th>d</th><th>da</th><th>df</th><th title="歯先円上の歯の厚さ [mm]">歯先厚</th><th>中心 (x, y)</th></tr>' +
-      rows.map(([id, nm, g, c]) => `<tr><td>${id} ${nm}</td><td>${g.m}</td><td>${g.z}</td><td>${g.x ? (g.x > 0 ? '+' : '') + g.x.toFixed(2) : '0'}</td><td>${f3(g.d)}</td><td>${f3(g.da)}</td><td>${f3(g.df)}</td>${tipCell(id)}<td>${c ? `${f3(c[0])}, ${f3(c[1])}` : '–'}</td></tr>`).join('') +
+    $('#gearTable').innerHTML = '<tr><th>ID</th><th>m</th><th>z</th><th title="転位係数 x（無次元）。転位量 = x × m [mm]（セルにカーソルで表示）">x</th><th>d</th><th>da</th><th>df</th><th title="歯先円上の歯の厚さ [mm]">歯先厚</th><th>中心 (x, y)</th></tr>' +
+      rows.map(([id, nm, g, c]) => `<tr><td>${id} ${nm}</td><td>${g.m}</td><td>${g.z}</td><td title="転位係数 x = ${g.x.toFixed(2)} → 転位量 ${f3(g.x * g.m)} mm">${g.x ? (g.x > 0 ? '+' : '') + g.x.toFixed(2) : '0'}</td><td>${f3(g.d)}</td><td>${f3(g.da)}</td><td>${f3(g.df)}</td>${tipCell(id)}<td>${c ? `${f3(c[0])}, ${f3(c[1])}` : '–'}</td></tr>`).join('') +
       `<tr><td colspan="9" class="muted" style="text-align:left">中心距離: 緑–黄 ${f3(D.aGY)} / 緑–青 ${f3(D.aGB)} / 緑–赤 ${f3(D.aGR)}（高低転位なので転位しても不変）</td></tr>`;
     renderMeshTable(MR);
   }
@@ -330,13 +342,13 @@
     const yn = (b) => (b ? '<span class="ng">あり</span>' : '<span class="ok">なし</span>');
     const epsCell = (e) => `<span class="${e >= cfg.epsMin ? '' : 'ng'}">${f2(e)}</span>`;
     const xs = (g) => (g.x ? (g.x > 0 ? '+' : '') + g.x.toFixed(2) : '0');
-    $('#meshTable').innerHTML = '<tr><th>かみ合い</th><th>z</th><th>x</th><th>干渉</th><th>かみ合い率</th><th>標準歯形のとき</th><th>干渉しない最小 x</th></tr>' +
-      MR.meshes.map((m) => `<tr><td>${m.id} ${m.name}</td><td>${m.p.z} / ${m.q.z}</td><td>${xs(m.p)} / ${xs(m.q)}</td>` +
+    $('#meshTable').innerHTML = '<tr><th>かみ合い</th><th>z</th><th title="転位係数 x（無次元）小歯車 / 相手。転位量 = x × m [mm]">x</th><th title="相手の歯先が基礎円より内側（インボリュートでない部分）に入るか">干渉</th><th title="同時にかみ合う歯の組数の平均。1.2 以上が目安">かみ合い率</th><th>標準歯形のとき</th><th title="小歯車の転位係数。転位量 = x × m [mm]">干渉しない最小 x</th></tr>' +
+      MR.meshes.map((m) => `<tr><td>${m.id} ${m.name}</td><td>${m.p.z} / ${m.q.z}</td><td title="転位量 ${f3(m.p.x * m.p.m)} / ${f3(m.q.x * m.q.m)} mm">${xs(m.p)} / ${xs(m.q)}</td>` +
         `<td>${yn(m.cur.intf)}</td><td>${m.cur.intf ? `${epsCell(m.cur.epsRelief)}<span class="muted">（逃がし後）</span>` : epsCell(m.cur.eps)}</td>` +
         `<td>${m.std.intf ? `干渉あり, 逃がし後 ε ${f2(m.std.epsRelief)}` : `干渉なし, ε ${f2(m.std.eps)}`}</td>` +
-        `<td>${m.need == null ? `<span class="ng">${cfg.xMaxAuto} 超</span>` : (m.need ? '+' + m.need.toFixed(2) : '0（不要）')}</td></tr>`).join('');
+        `<td>${m.need == null ? `<span class="ng">${cfg.xMaxAuto} 超</span>` : (m.need ? `<span title="転位量 ${f3(m.need * m.p.m)} mm">+${m.need.toFixed(2)}</span>` : '0（不要）')}</td></tr>`).join('');
     $('#meshNote').innerHTML = `干渉 = 相手の歯先が基礎円より内側（インボリュートでない部分）に入る。逃がし後 = その部分を削った場合（アンダーカット相当）のかみ合い率。` +
-      `転位は高低転位（外歯車対 x1 = −x2，内歯車対 x1 = x2）。赤・青は同じ x，緑一層目は −x。` +
+      `x は転位係数（無次元）で，転位量 = x × m [mm]。転位は高低転位（外歯車対 x1 = −x2，内歯車対 x1 = x2）。赤・青は同じ x，緑一層目は −x。` +
       (MR.singleLayerNoShift ? '<br><span class="ng">一層構造では緑が両方のかみ合いに共通のため転位は未対応（x = 0 で表示）</span>' : '');
   }
 
