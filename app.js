@@ -23,7 +23,7 @@
     ['zMin', '最小歯数', 'int'], ['zMaxRed', '赤 最大', 'int'], ['zMaxBlue', '青 最大', 'int'], ['zMaxGreen', '緑 最大', 'int'],
     ['internalMinDiff', '黄 − 緑二層目 最小差', 'int'],
     ['grp', '寸法 [mm]'],
-    ['yellowRootMax', '黄 歯底円直径 上限', 'num'], ['blueY', '青 中心 y', 'num'], ['purpleD', '紫円 直径', 'num'], ['brownD', '茶円 直径', 'num'],
+    ['yellowRootMax', '黄 歯底円直径 上限', 'num'], ['blueY', '青 中心 y', 'num'], ['purpleD', 'モーター（紫円）直径', 'num'], ['brownD', '茶円 直径', 'num'],
     ['grp', 'すき間 [mm]'],
     ['clrPart', '歯先円 ↔ 水色部品', 'num'], ['clrGear', '歯先円 ↔ 歯先円・軸', 'num'],
     ['redBlueTip', '赤 ↔ 青 歯先円を干渉させない（二層時も）', 'bool'],
@@ -33,11 +33,12 @@
     ['green1InYellow', '緑1 も黄の歯先円内（二層時）', 'bool'],
     ['green1OuterMax', '緑1 最外点の上限半径', 'num'],
     ['grp', '配置探索 [mm]'],
-    ['clrPurplePart', '紫円 ↔ P1・P3 すき間', 'num'], ['ballD', '球 直径（黄の中心）', 'num'], ['clrPurpleBall', '紫円 ↔ 球 すき間', 'num'],
+    ['clrPurplePart', 'モーター ↔ P1・P3 すき間', 'num'], ['ballD', '球 直径（黄の中心）', 'num'], ['clrPurpleBall', 'モーター ↔ 球 すき間', 'num'],
+    ['motorTailD', 'モーター尻 直径（モーターと同心）', 'num'], ['motorTailXMin', 'モーター尻 全体が x > ', 'num'],
     ['redXRef', '赤 現在位置 x（移動量の基準）', 'num'], ['redYRef', '赤 中心 y 基準（現在位置 y）', 'num'], ['redYTol', '赤 中心 y 許容 ±', 'num'],
     ['xbMin', '青 x 下限', 'num'], ['xbMax', '青 x 上限', 'num'], ['xbStep', '青 x 刻み', 'num'],
   ];
-  const STORE_KEY = 'gearsheet.cfg.v13';
+  const STORE_KEY = 'gearsheet.cfg.v14';
 
   function loadCfg() {
     let saved = {};
@@ -332,9 +333,11 @@
     if (P && D.layered) shapes.push({ kind: 'circle', id: 'B.shaft', name: '青 軸', c: P.B, r: cfg.blueShaftD / 2, color: 'var(--blue)', width: 1, dash: '', info: [cfg.redBlueTip ? '赤 ↔ 青は歯先円同士で判定中' : '二層時は赤の歯先円とこの軸で干渉判定'] });
     shapes.push({ kind: 'circle', id: 'BR', name: '茶円', c: [0, 0], r: cfg.brownD / 2, color: 'var(--brown)', width: 1.5, dash: '', info: ['黄と同心'] });
     shapes.push({ kind: 'circle', id: 'BL', name: '球', c: [0, 0], r: cfg.ballD / 2, color: 'var(--brown)', width: 1.5, dash: '', info: ['黄の中心にある球（投影）'] });
-    if (P) shapes.push({ kind: 'circle', id: 'PU', name: '紫円', c: P.R, r: cfg.purpleD / 2, color: 'var(--purple)', width: 1.5, dash: '', info: ['赤と同心'] });
+    if (P) shapes.push({ kind: 'circle', id: 'PU', name: 'モーター（紫円）', c: P.R, r: cfg.purpleD / 2, color: 'var(--purple)', width: 1.5, dash: '', info: ['赤と同心'] });
+    if (P) shapes.push({ kind: 'circle', id: 'MT', name: 'モーター尻', c: P.R, r: cfg.motorTailD / 2, color: 'var(--purple)', width: 1, dash: '5 3', info: ['モーターと同心', `円全体が x > ${cfg.motorTailXMin}（ローラー固定のアルミ板との干渉防止）`] });
+    shapes.push({ kind: 'vline', id: 'L.mt', name: 'モーター尻の制限線', x: cfg.motorTailXMin, color: 'var(--purple)' });
     for (const part of GC.PARTS) {
-      shapes.push({ kind: 'poly', id: part.id, name: part.name, pts: part.poly, color: 'var(--part)', info: part.purpleOnly ? ['紫円（モーター）とだけ干渉判定'] : [] });
+      shapes.push({ kind: 'poly', id: part.id, name: part.name, pts: part.poly, color: 'var(--part)', info: part.purpleOnly ? ['モーター（紫円）とだけ干渉判定'] : [] });
       part.poly.forEach((p, i) => shapes.push({ kind: 'point', id: `${part.id}.v${i}`, name: part.name + ' 頂点', p, color: 'var(--part)', draw: false }));
     }
     shapes.push({ kind: 'point', id: 'R0', name: '赤 現在位置（移動量の基準）', p: [cfg.redXRef, cfg.redYRef], color: 'var(--red)', draw: true });
@@ -378,6 +381,10 @@
     if (sh.kind === 'hline') {
       const [W] = size(); const [, y] = toS([0, sh.y]);
       return `<line x1="0" x2="${W}" y1="${y}" y2="${y}" style="stroke:${sh.color}" stroke-width="0.75" stroke-dasharray="4 4"/>`;
+    }
+    if (sh.kind === 'vline') {
+      const [, H] = size(); const [x] = toS([sh.x, 0]);
+      return `<line${cls} x1="${x}" x2="${x}" y1="0" y2="${H}" style="stroke:${extraCls ? '' : sh.color}" stroke-width="${extraCls ? 2 : 1}" stroke-dasharray="6 4"/>`;
     }
     return '';
   }
@@ -439,6 +446,9 @@
         const dx = w[0] - sh.c[0], dy = w[1] - sh.c[1], rr = Math.hypot(dx, dy) || 1e-9;
         const d = Math.abs(rr - sh.r) * k;
         if (d <= 6 * hitScale) consider({ shape: sh, type: 'edge', p: [sh.c[0] + (dx / rr) * sh.r, sh.c[1] + (dy / rr) * sh.r] }, d, 1);
+      } else if (sh.kind === 'vline') {
+        const d = Math.abs(w[0] - sh.x) * k;
+        if (d <= 6 * hitScale) consider({ shape: sh, type: 'edge', p: [sh.x, w[1]] }, d, 1);
       } else if (sh.kind === 'poly') {
         const pd = GC.polyDist(w[0], w[1], sh.pts);
         const d = Math.abs(pd.d) * k;
@@ -453,6 +463,7 @@
     const sh = h.shape, p = h.p;
     const lines = [`<b>${sh.id}　${sh.name}</b>`];
     if (sh.kind === 'point') lines.push(`座標 (${f3(p[0])}, ${f3(p[1])})`);
+    if (sh.kind === 'vline') lines.push(`x = ${f3(sh.x)}（モーター尻の円はこの線より右）`, `線上の点 (${f3(p[0])}, ${f3(p[1])})`);
     if (sh.id === 'R0' && state.ev && state.ev.P) lines.push(`赤中心までの移動量 ${f3(GC.redMove(viewCfg(), state.ev.P.R))}`);
     if (sh.kind === 'circle') {
       lines.push(...(sh.info || []));

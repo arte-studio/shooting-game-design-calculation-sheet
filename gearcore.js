@@ -34,7 +34,7 @@
     },
   ];
 
-  // 歯車の歯先円と干渉判定する部品 / 紫円（モーター）と干渉判定する部品
+  // 歯車の歯先円と干渉判定する部品 / モーター（紫円）と干渉判定する部品
   const GEAR_PARTS = PARTS.filter((q) => !q.purpleOnly);
   const PURPLE_PARTS = PARTS.filter((q) => q.purpleOnly || q.id === 'P1');
 
@@ -87,9 +87,11 @@
     redXRef: 39.1,          // 赤 中心の現在位置 x（図2・図4）。移動量の基準
     redYRef: 3.15,          // 赤 中心 y の基準（図2・図4 の赤の現在位置 (39.1, 3.15)）
     redYTol: 5,             // 赤 中心 y の許容幅 ±（基準からの相対）
-    clrPurplePart: 0,       // 紫円 ↔ P1（レバー）・P3（上部ブロック）の最小すき間（被らなければよい）
-    ballD: 27,              // 黄の中心にある球の直径。紫円と干渉させない
-    clrPurpleBall: 0.5,     // 紫円 ↔ 球 の最小すき間
+    clrPurplePart: 0,       // モーター（紫円） ↔ P1（レバー）・P3（上部ブロック）の最小すき間（被らなければよい）
+    ballD: 27,              // 黄の中心にある球の直径。モーター（紫円）と干渉させない
+    clrPurpleBall: 0.5,     // モーター（紫円） ↔ 球 の最小すき間
+    motorTailD: 28,         // モーター尻（紫円と同心）の直径
+    motorTailXMin: 23.5,    // モーター尻の円全体が x > この値（ローラー固定のアルミ板との干渉防止）
     maxResults: 200000,
   };
 
@@ -249,13 +251,15 @@
     }
     const rR = D.R.da / 2, rB = D.B.da / 2;
     const rRmax = (cfg.brownD - cfg.purpleD) / 2;
-    add('C3', '紫φ' + cfg.purpleD + ' ⊂ 茶φ' + cfg.brownD, rRmax - Math.hypot(P.R[0], P.R[1]), '|R| = ' + Math.hypot(P.R[0], P.R[1]).toFixed(3));
+    add('C3', 'モーター φ' + cfg.purpleD + ' ⊂ 茶φ' + cfg.brownD, rRmax - Math.hypot(P.R[0], P.R[1]), '|R| = ' + Math.hypot(P.R[0], P.R[1]).toFixed(3));
     for (const part of PURPLE_PARTS) {
       const dPU = polyDist(P.R[0], P.R[1], part.poly).d - cfg.purpleD / 2;
-      add('C8', '紫円 φ' + cfg.purpleD + ' ↔ ' + part.id + ' ' + part.name, dPU - cfg.clrPurplePart, 'すき間 ' + dPU.toFixed(3) + ' mm');
+      add('C8', 'モーター φ' + cfg.purpleD + ' ↔ ' + part.id + ' ' + part.name, dPU - cfg.clrPurplePart, 'すき間 ' + dPU.toFixed(3) + ' mm');
     }
-    add('C9', '紫円 φ' + cfg.purpleD + ' ↔ 球 φ' + cfg.ballD, Math.hypot(P.R[0], P.R[1]) - (cfg.purpleD + cfg.ballD) / 2 - cfg.clrPurpleBall,
+    add('C9', 'モーター φ' + cfg.purpleD + ' ↔ 球 φ' + cfg.ballD, Math.hypot(P.R[0], P.R[1]) - (cfg.purpleD + cfg.ballD) / 2 - cfg.clrPurpleBall,
       'すき間 ' + (Math.hypot(P.R[0], P.R[1]) - (cfg.purpleD + cfg.ballD) / 2).toFixed(3) + ' mm');
+    add('C10', 'モーター尻 φ' + cfg.motorTailD + ' が x > ' + cfg.motorTailXMin, P.R[0] - redXMin(cfg),
+      '左端 x = ' + (P.R[0] - cfg.motorTailD / 2).toFixed(3));
     add('C7a', '青 中心 x ∈ [' + cfg.xbMin + ', ' + cfg.xbMax + ']', Math.min(P.B[0] - cfg.xbMin, cfg.xbMax - P.B[0]), 'x = ' + P.B[0].toFixed(3));
     add('C7b', '赤 中心 y = ' + cfg.redYRef + ' ± ' + cfg.redYTol, cfg.redYTol - Math.abs(P.R[1] - cfg.redYRef), 'y = ' + P.R[1].toFixed(3));
 
@@ -308,7 +312,7 @@
   // 赤のみの余裕（rR: 赤歯先半径）
   function slackR(cfg, D, field, R, B, rR) {
     const rn = Math.hypot(R[0], R[1]);
-    let s = Math.min((cfg.brownD - cfg.purpleD) / 2 - rn, cfg.redYTol - Math.abs(R[1] - cfg.redYRef));
+    let s = Math.min((cfg.brownD - cfg.purpleD) / 2 - rn, cfg.redYTol - Math.abs(R[1] - cfg.redYRef), R[0] - redXMin(cfg));
     s = Math.min(s, rn - redRmin(cfg));
     s = Math.min(s, Math.hypot(R[0] - B[0], R[1] - B[1]) - rR - blueObstacleR(cfg, D) - clrRedBlue(cfg));
     if (cfg.checkCrossLayer) s = Math.min(s, D.Y.da / 2 - rn - rR - cfg.clrGear);
@@ -322,11 +326,14 @@
   // 赤中心の現在位置からの移動量
   function redMove(cfg, R) { return Math.hypot(R[0] - cfg.redXRef, R[1] - cfg.redYRef); }
 
-  // 赤中心の原点からの最小距離（紫円 ↔ 球）
+  // 赤中心 x の下限（モーター尻の円全体が x > motorTailXMin）
+  function redXMin(cfg) { return cfg.motorTailXMin + cfg.motorTailD / 2; }
+
+  // 赤中心の原点からの最小距離（モーター ↔ 球）
   function redRmin(cfg) { return (cfg.purpleD + cfg.ballD) / 2 + cfg.clrPurpleBall; }
 
   // 赤の角度候補: rmin ≤ |R| ≤ rmax かつ |R.y − yRef| ≤ yTol となる円弧上をサンプル
-  function redAngles(G, aGR, rmax, n, yRef, yTol, rmin) {
+  function redAngles(G, aGR, rmax, n, yRef, yTol, rmin, xMin) {
     const g = Math.hypot(G[0], G[1]);
     const th0 = Math.atan2(-G[1], -G[0]);
     const c = (g * g + aGR * aGR - rmax * rmax) / (2 * g * aGR);
@@ -362,6 +369,19 @@
             segs = nx;
           }
           out.push(...segs);
+        }
+        arcs = out;
+      }
+    }
+    if (xMin != null && isFinite(xMin)) {
+      // R.x = G.x + aGR·cosφ ≥ xMin
+      const cc = (xMin - G[0]) / aGR;
+      if (cc > 1) return [];
+      if (cc > -1) {
+        const w3 = Math.acos(cc), out = [];
+        for (const [l, h] of arcs) for (const k of [-2, -1, 0, 1, 2]) {
+          const lo = Math.max(l, -w3 + 2 * Math.PI * k), hi = Math.min(h, w3 + 2 * Math.PI * k);
+          if (hi >= lo) out.push([lo, hi]);
         }
         arcs = out;
       }
@@ -410,7 +430,7 @@
       const rR = (c.m1 * (zr + 2 * cfg.addendum)) / 2;
       let zrBest = null;
       for (const p of pick) {
-        for (const phi of redAngles(p.G, aGR, rmax, 13, cfg.redYRef, cfg.redYTol, redRmin(cfg))) {
+        for (const phi of redAngles(p.G, aGR, rmax, 13, cfg.redYRef, cfg.redYTol, redRmin(cfg), redXMin(cfg))) {
           const R = [p.G[0] + aGR * Math.cos(phi), p.G[1] + aGR * Math.sin(phi)];
           const s = Math.min(p.s, slackR(cfg, D, field, R, p.B, rR));
           if (s >= 0 && (!zrBest || s > zrBest.s)) zrBest = { s, xb: p.xb, branch: p.branch, phi };
@@ -429,7 +449,7 @@
       const aGR = (c.m1 * (c.zg1 + zr)) / 2;
       const rR = (c.m1 * (zr + 2 * cfg.addendum)) / 2;
       for (const p of cands) {
-        const phis = redAngles(p.G, aGR, rmax, 13, cfg.redYRef, cfg.redYTol, redRmin(cfg));
+        const phis = redAngles(p.G, aGR, rmax, 13, cfg.redYRef, cfg.redYTol, redRmin(cfg), redXMin(cfg));
         phis.push(Math.atan2(cfg.redYRef - p.G[1], cfg.redXRef - p.G[0])); // 円上で基準に最も近い点
         for (const phi of phis) {
           const R = [p.G[0] + aGR * Math.cos(phi), p.G[1] + aGR * Math.sin(phi)];
@@ -559,7 +579,7 @@
         const B = [xb, cfg.blueY];
         const sb = slackBG(cfg, D, field, B, G);
         if (move ? sb < 0 : sb < best.v) continue;
-        const phis = redAngles(G, D.aGR, rmax, 37, cfg.redYRef, cfg.redYTol, redRmin(cfg));
+        const phis = redAngles(G, D.aGR, rmax, 37, cfg.redYRef, cfg.redYTol, redRmin(cfg), redXMin(cfg));
         if (move) phis.push(Math.atan2(cfg.redYRef - G[1], cfg.redXRef - G[0]));
         for (const phi of phis) {
           const R = [G[0] + D.aGR * Math.cos(phi), G[1] + D.aGR * Math.sin(phi)];
