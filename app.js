@@ -37,7 +37,7 @@
     ['redXRef', '赤 現在位置 x（移動量の基準）', 'num'], ['redYRef', '赤 中心 y 基準（現在位置 y）', 'num'], ['redYTol', '赤 中心 y 許容 ±', 'num'],
     ['xbMin', '青 x 下限', 'num'], ['xbMax', '青 x 上限', 'num'], ['xbStep', '青 x 刻み', 'num'],
   ];
-  const STORE_KEY = 'gearsheet.cfg.v12';
+  const STORE_KEY = 'gearsheet.cfg.v13';
 
   function loadCfg() {
     let saved = {};
