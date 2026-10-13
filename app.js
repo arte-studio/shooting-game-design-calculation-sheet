@@ -321,7 +321,8 @@
     const gears = [['Y', '黄', 'var(--yellow)', D.Y, [0, 0], '']];
     if (P) {
       gears.push(['G1', D.layered ? '緑 一層目' : '緑', 'var(--green)', D.G1, P.G, '']);
-      if (D.layered) gears.push(['G2', '緑 二層目', 'var(--green)', D.G2, P.G, '9 3 2 3']);
+      // 二層目は一層目と同心なので, 少し黄みの緑で区別する
+      if (D.layered) gears.push(['G2', '緑 二層目', 'var(--green2)', D.G2, P.G, '']);
       gears.push(['R', '赤', 'var(--red)', D.R, P.R, ''], ['B', '青', 'var(--blue)', D.B, P.B, '']);
     }
     for (const [id, nm, col, g, c, dash] of gears) {
