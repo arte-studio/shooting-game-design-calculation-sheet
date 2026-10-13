@@ -101,7 +101,7 @@
   const TIPS = {
     m1: 'モジュール m1：赤・青・緑一層目（歯の大きさ。基準円直径 ÷ 歯数）[mm]',
     m2: 'モジュール m2：緑二層目・黄 [mm]',
-    zr: '赤（モーター側）の歯数。( ) は成立する歯数の範囲', zb: '青（出力1）の歯数', zg1: '緑一層目の歯数（赤・青とかみ合う）',
+    zr: '赤（モーター側）の歯数。( ) は成立する歯数の範囲（赤は速度比に関係しないので範囲内のどれでも可）。表示値は行を選んだときに使う歯数：並び替え①が赤移動なら移動量最小になる歯数、それ以外は余裕最大になる歯数', zb: '青（出力1）の歯数', zg1: '緑一層目の歯数（赤・青とかみ合う）',
     zg2: '緑二層目の歯数（黄とかみ合う）', zy: '黄（出力2，内歯車）の歯数',
     layered: '緑の構造。一層 = 一層目と二層目が同じ歯車，二層 = 別の歯車を重ねる',
     ratioErrPct: '速度比の目標からの誤差 [%]（厳密一致なので 0）',
@@ -286,7 +286,8 @@
     ['layered', '層'], ['ratioErrPct', '比誤差%'], ['yellowDf', '黄df'], ['score', '余裕'], ['redMove', '赤移動']];
   const DESC_FIRST = new Set(['minM', 'm1', 'm2', 'score']);   // 初回クリックで降順にするキー
   // 赤移動は探索の刻み（青 x 1 mm）による誤差があるので 0.1 mm 単位で比較し, 第2優先が効くようにする
-  const sortVal = (r, k) => (k === 'minM' ? Math.min(r.m1, r.m2) : k === 'layered' ? +r.layered : k === 'redMove' ? Math.round(r.redMove * 10) / 10 : r[k]);
+  const sortVal = (r, k) => (k === 'minM' ? Math.min(r.m1, r.m2) : k === 'layered' ? +r.layered : k === 'redMove' ? Math.round(r.redMove * 10) / 10 :
+    k === 'zr' && state.sort[0].k === 'redMove' ? r.zrMove : r[k]);   // z赤 は表示中の歯数で比較
 
   function buildSortCtl() {
     const opts = (none) => (none ? '<option value="">なし</option>' : '') + SORT_KEYS.map(([k, l]) => `<option value="${k}">${l}</option>`).join('');
@@ -319,11 +320,12 @@
     }
     syncSortCtl();
     const rows = v.slice(state.page * pp, (state.page + 1) * pp);
+    const move = state.sort[0].k === 'redMove';
     const tb = $('#resTable tbody');
     tb.innerHTML = rows.map((r, i) => {
       const sel = state.sel && state.sel.src === r ? ' class="sel"' : '';
       const zrRange = r.zrList.length > 1 ? `<span class="muted">(${r.zrList[0]}–${r.zrList[r.zrList.length - 1]})</span>` : '';
-      return `<tr data-i="${state.page * pp + i}"${sel}><td>${r.m1}</td><td>${r.m2}</td><td>${r.zr}${zrRange}</td><td>${r.zb}</td><td>${r.zg1}</td><td>${r.zg2}</td><td>${r.zy}</td>` +
+      return `<tr data-i="${state.page * pp + i}"${sel}><td>${r.m1}</td><td>${r.m2}</td><td>${move ? r.zrMove : r.zr}${zrRange}</td><td>${r.zb}</td><td>${r.zg1}</td><td>${r.zg2}</td><td>${r.zy}</td>` +
         `<td>${r.layered ? '二層' : '一層'}</td><td>${f3(r.ratioErrPct)}</td><td>${f2(r.yellowDf)}</td><td>${f2(r.score)}</td><td>${f2(r.redMove)}</td></tr>`;
     }).join('') || '<tr><td colspan="12" class="muted" style="text-align:center">探索実行で結果を表示</td></tr>';
   }
