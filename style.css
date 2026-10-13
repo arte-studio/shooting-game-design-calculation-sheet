@@ -38,6 +38,10 @@ main { flex: 1; display: grid; grid-template-columns: var(--wL, 360px) 6px minma
 .splitter { cursor: col-resize; background: var(--line); touch-action: none; }
 .splitter:hover, .splitter.drag { background: var(--accent); }
 body.resizing { cursor: col-resize; user-select: none; }
+/* 説明つきの文字はカーソルを ? に */
+label[title], th[title], td[title], summary[title], div[title], span[title] { cursor: help; }
+#resTable th[title], .splitter { cursor: pointer; }
+.splitter { cursor: col-resize; }
 section { min-height: 0; overflow: auto; }
 #left, #right { background: var(--panel); padding: 8px 12px; }
 #center { display: flex; flex-direction: column; overflow: hidden; }
