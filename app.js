@@ -17,8 +17,12 @@
     ['grp', 'モジュール（任意値を刻みで走査）'],
     ['modMin', '下限', 'num'], ['modMax', '上限', 'num'], ['modStep', '刻み', 'num'],
     ['allowTwoLayer', '緑の二層構造を許可', 'bool'],
-    ['grp', '歯形（標準・転位なし）'],
+    ['grp', '歯形'],
     ['pressureAngleDeg', '圧力角 [°]', 'num'], ['addendum', '歯末の丈 係数', 'num'], ['dedendum', '歯元の丈 係数', 'num'],
+    ['grp', 'かみ合い干渉・転位（選んだ解の詳細に反映。探索の候補は弾かない）'],
+    ['shiftMode', '転位', 'sel', null, [['none', 'なし（標準）'], ['auto', '自動（干渉しない最小）'], ['manual', '手動']]],
+    ['xRB', '赤・青 の転位 +x（緑1 は −x）', 'num', 'shiftMode=manual'], ['xG2', '緑2・黄 の転位 +x', 'num', 'shiftMode=manual'],
+    ['tipMinM', '歯先厚さ 目安下限 [×m]', 'num'], ['tipMinMM', '歯先厚さ 目安下限 [mm]', 'num'], ['epsMin', 'かみ合い率 目安下限', 'num'],
     ['grp', '歯数'],
     ['zMin', '最小歯数', 'int'], ['zMaxRed', '赤 最大', 'int'], ['zMaxBlue', '青 最大', 'int'], ['zMaxGreen', '緑 最大', 'int'],
     ['internalMinDiff', '黄 − 緑二層目 最小差', 'int'],
@@ -39,7 +43,7 @@
     ['redXRef', '赤 現在位置 x（移動量の基準）', 'num'], ['redYRef', '赤 中心 y 基準（現在位置 y）', 'num'], ['redYTol', '赤 中心 y 許容 ±', 'num'],
     ['xbMin', '青 x 下限', 'num'], ['xbMax', '青 x 上限', 'num'], ['xbStep', '青 x 刻み', 'num'],
   ];
-  const STORE_KEY = 'gearsheet.cfg.v15';
+  const STORE_KEY = 'gearsheet.cfg.v16';
 
   function loadCfg() {
     let saved = {};
@@ -54,30 +58,33 @@
     const form = $('#cfgForm');
     form.innerHTML = '';
     const deps = [];
-    for (const [k, label, type, dep] of FIELDS) {
+    for (const [k, label, type, dep, opts] of FIELDS) {
       if (k === 'grp') { const d = document.createElement('div'); d.className = 'grp'; d.textContent = label; form.appendChild(d); continue; }
       const lab = document.createElement('label'); lab.textContent = label; lab.htmlFor = 'cf_' + k;
-      const inp = document.createElement('input'); inp.id = 'cf_' + k; inp.dataset.k = k; inp.dataset.t = type;
-      if (type === 'bool') { inp.type = 'checkbox'; inp.checked = !!cfg[k]; }
+      const inp = document.createElement(type === 'sel' ? 'select' : 'input'); inp.id = 'cf_' + k; inp.dataset.k = k; inp.dataset.t = type;
+      if (type === 'sel') { inp.innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join(''); inp.value = cfg[k]; }
+      else if (type === 'bool') { inp.type = 'checkbox'; inp.checked = !!cfg[k]; }
       else { inp.type = 'number'; inp.step = type === 'int' ? '1' : 'any'; inp.value = cfg[k]; }
       if (dep) { lab.classList.add('sub'); deps.push([dep, lab, inp]); }
       form.appendChild(lab); form.appendChild(inp);
     }
-    // 依存項目: チェックボックスの状態に応じて表示（'!k' はオフのとき表示）
+    // 依存項目: 'k' = チェックでオン, '!k' = オフで表示, 'k=v' = 選択値が v で表示
+    const depKey = (dep) => dep.replace('!', '').split('=')[0];
     const upd = () => {
       for (const [dep, lab, inp] of deps) {
-        const neg = dep[0] === '!', on = $('#cf_' + dep.replace('!', '')).checked !== neg;
+        const el = $('#cf_' + depKey(dep));
+        const on = dep.includes('=') ? el.value === dep.split('=')[1] : el.checked !== (dep[0] === '!');
         lab.hidden = inp.hidden = !on;
       }
     };
-    for (const dep of new Set(deps.map((d) => d[0].replace('!', '')))) $('#cf_' + dep).addEventListener('change', upd);
+    for (const k of new Set(deps.map((d) => depKey(d[0])))) $('#cf_' + k).addEventListener('change', upd);
     upd();
   }
   function readForm() {
     const cfg = Object.assign({}, GC.DEFAULTS, { ratioTolPct: 0 });
-    for (const inp of document.querySelectorAll('#cfgForm input')) {
+    for (const inp of document.querySelectorAll('#cfgForm input, #cfgForm select')) {
       const k = inp.dataset.k, t = inp.dataset.t;
-      cfg[k] = t === 'bool' ? inp.checked : t === 'int' ? parseInt(inp.value, 10) : parseFloat(inp.value);
+      cfg[k] = t === 'sel' ? inp.value : t === 'bool' ? inp.checked : t === 'int' ? parseInt(inp.value, 10) : parseFloat(inp.value);
     }
     return cfg;
   }
@@ -303,12 +310,34 @@
 
   function renderGearTable() {
     const ev = state.ev, D = ev.D, P = ev.P;
+    const MR = GC.meshReport(viewCfg(), state.sel.s, D);
     const rows = [['R', '赤', D.R, P && P.R], ['G1', D.layered ? '緑 一層目' : '緑', D.G1, P && P.G]];
     if (D.layered) rows.push(['G2', '緑 二層目', D.G2, P && P.G]);
     rows.push(['B', '青', D.B, P && P.B], ['Y', '黄(内)', D.Y, [0, 0]]);
-    $('#gearTable').innerHTML = '<tr><th>ID</th><th>m</th><th>z</th><th>d</th><th>da</th><th>df</th><th>中心 (x, y)</th></tr>' +
-      rows.map(([id, nm, g, c]) => `<tr><td>${id} ${nm}</td><td>${g.m}</td><td>${g.z}</td><td>${f3(g.d)}</td><td>${f3(g.da)}</td><td>${f3(g.df)}</td><td>${c ? `${f3(c[0])}, ${f3(c[1])}` : '–'}</td></tr>`).join('') +
-      `<tr><td colspan="7" class="muted" style="text-align:left">中心距離: 緑–黄 ${f3(D.aGY)} / 緑–青 ${f3(D.aGB)} / 緑–赤 ${f3(D.aGR)}</td></tr>`;
+    const tipCell = (id) => {
+      const t = MR.tips[id];
+      return `<td class="${t.ok ? '' : 'ng'}" title="目安 ${f2(t.lim)} mm 以上">${isNaN(t.t) ? '–' : f2(t.t)}</td>`;
+    };
+    $('#gearTable').innerHTML = '<tr><th>ID</th><th>m</th><th>z</th><th>x</th><th>d</th><th>da</th><th>df</th><th title="歯先円上の歯の厚さ [mm]">歯先厚</th><th>中心 (x, y)</th></tr>' +
+      rows.map(([id, nm, g, c]) => `<tr><td>${id} ${nm}</td><td>${g.m}</td><td>${g.z}</td><td>${g.x ? (g.x > 0 ? '+' : '') + g.x.toFixed(2) : '0'}</td><td>${f3(g.d)}</td><td>${f3(g.da)}</td><td>${f3(g.df)}</td>${tipCell(id)}<td>${c ? `${f3(c[0])}, ${f3(c[1])}` : '–'}</td></tr>`).join('') +
+      `<tr><td colspan="9" class="muted" style="text-align:left">中心距離: 緑–黄 ${f3(D.aGY)} / 緑–青 ${f3(D.aGB)} / 緑–赤 ${f3(D.aGR)}（高低転位なので転位しても不変）</td></tr>`;
+    renderMeshTable(MR);
+  }
+
+  // かみ合いごとの干渉・かみ合い率・必要な転位（判定のみ。成立/不成立には含めない）
+  function renderMeshTable(MR) {
+    const cfg = viewCfg();
+    const yn = (b) => (b ? '<span class="ng">あり</span>' : '<span class="ok">なし</span>');
+    const epsCell = (e) => `<span class="${e >= cfg.epsMin ? '' : 'ng'}">${f2(e)}</span>`;
+    const xs = (g) => (g.x ? (g.x > 0 ? '+' : '') + g.x.toFixed(2) : '0');
+    $('#meshTable').innerHTML = '<tr><th>かみ合い</th><th>z</th><th>x</th><th>干渉</th><th>かみ合い率</th><th>標準歯形のとき</th><th>干渉しない最小 x</th></tr>' +
+      MR.meshes.map((m) => `<tr><td>${m.id} ${m.name}</td><td>${m.p.z} / ${m.q.z}</td><td>${xs(m.p)} / ${xs(m.q)}</td>` +
+        `<td>${yn(m.cur.intf)}</td><td>${m.cur.intf ? `${epsCell(m.cur.epsRelief)}<span class="muted">（逃がし後）</span>` : epsCell(m.cur.eps)}</td>` +
+        `<td>${m.std.intf ? `干渉あり, 逃がし後 ε ${f2(m.std.epsRelief)}` : `干渉なし, ε ${f2(m.std.eps)}`}</td>` +
+        `<td>${m.need == null ? `<span class="ng">${cfg.xMaxAuto} 超</span>` : (m.need ? '+' + m.need.toFixed(2) : '0（不要）')}</td></tr>`).join('');
+    $('#meshNote').innerHTML = `干渉 = 相手の歯先が基礎円より内側（インボリュートでない部分）に入る。逃がし後 = その部分を削った場合（アンダーカット相当）のかみ合い率。` +
+      `転位は高低転位（外歯車対 x1 = −x2，内歯車対 x1 = x2）。赤・青は同じ x，緑一層目は −x。` +
+      (MR.singleLayerNoShift ? '<br><span class="ng">一層構造では緑が両方のかみ合いに共通のため転位は未対応（x = 0 で表示）</span>' : '');
   }
 
   function renderConsTable() {

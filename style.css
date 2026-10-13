@@ -47,7 +47,7 @@ summary { font-weight: 600; cursor: pointer; padding: 4px 0; }
 
 .cfg { display: grid; grid-template-columns: 1fr 96px; gap: 3px 8px; align-items: center; }
 .cfg label { color: var(--muted); }
-.cfg input[type=number], .cfg input[type=text] { width: 100%; }
+.cfg input[type=number], .cfg input[type=text], .cfg select { width: 100%; }
 .cfg .full { grid-column: 1 / -1; }
 .cfg label.sub { padding-left: 1.2em; }
 .cfg [hidden] { display: none; }
@@ -74,6 +74,9 @@ th.sorted::after { content: attr(data-dir); color: var(--accent); }
 #resTable tbody tr.sel { background: var(--sel); }
 td.warn { color: var(--warn); }
 table.small td:first-child, table.small th:first-child { text-align: left; }
+#right table.small { display: block; overflow-x: auto; }
+table.small td[colspan] { white-space: normal; min-width: 280px; }
+.note { font-size: 12px; margin-top: 4px; }
 td.ok { color: var(--ok); } td.ng { color: var(--ng); font-weight: 600; }
 .pager { justify-content: center; }
 
