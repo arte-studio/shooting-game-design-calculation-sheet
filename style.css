@@ -49,6 +49,8 @@ summary { font-weight: 600; cursor: pointer; padding: 4px 0; }
 .cfg label { color: var(--muted); }
 .cfg input[type=number], .cfg input[type=text] { width: 100%; }
 .cfg .full { grid-column: 1 / -1; }
+.cfg label.sub { padding-left: 1.2em; }
+.cfg [hidden] { display: none; }
 .cfg .grp { grid-column: 1 / -1; font-weight: 600; margin-top: 6px; border-bottom: 1px solid var(--line); }
 input, select, button { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 2px 4px; }
 button { background: var(--accent); color: #fff; border-color: var(--accent); padding: 4px 10px; cursor: pointer; }

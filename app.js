@@ -27,7 +27,8 @@
     ['grp', 'すき間 [mm]'],
     ['clrPart', '歯先円 ↔ 水色部品', 'num'], ['clrGear', '歯先円 ↔ 歯先円・軸', 'num'],
     ['redBlueTip', '赤 ↔ 青 歯先円を干渉させない（二層時も）', 'bool'],
-    ['blueShaftD', '青 軸径（上をオフ時の赤↔青判定）', 'num'],
+    ['clrRedBlue', '赤 ↔ 青 歯先円 最小距離', 'num', 'redBlueTip'],
+    ['blueShaftD', '青 軸径（赤 ↔ 青軸 で判定）', 'num', '!redBlueTip'],
     ['checkCrossLayer', '赤・青 が黄の歯先円内', 'bool'],
     ['green1InYellow', '緑1 も黄の歯先円内（二層時）', 'bool'],
     ['green1OuterMax', '緑1 最外点の上限半径', 'num'],
@@ -36,7 +37,7 @@
     ['redXRef', '赤 現在位置 x（移動量の基準）', 'num'], ['redYRef', '赤 中心 y 基準（現在位置 y）', 'num'], ['redYTol', '赤 中心 y 許容 ±', 'num'],
     ['xbMin', '青 x 下限', 'num'], ['xbMax', '青 x 上限', 'num'], ['xbStep', '青 x 刻み', 'num'],
   ];
-  const STORE_KEY = 'gearsheet.cfg.v11';
+  const STORE_KEY = 'gearsheet.cfg.v12';
 
   function loadCfg() {
     let saved = {};
@@ -50,14 +51,25 @@
   function buildForm(cfg) {
     const form = $('#cfgForm');
     form.innerHTML = '';
-    for (const [k, label, type] of FIELDS) {
+    const deps = [];
+    for (const [k, label, type, dep] of FIELDS) {
       if (k === 'grp') { const d = document.createElement('div'); d.className = 'grp'; d.textContent = label; form.appendChild(d); continue; }
       const lab = document.createElement('label'); lab.textContent = label; lab.htmlFor = 'cf_' + k;
       const inp = document.createElement('input'); inp.id = 'cf_' + k; inp.dataset.k = k; inp.dataset.t = type;
       if (type === 'bool') { inp.type = 'checkbox'; inp.checked = !!cfg[k]; }
       else { inp.type = 'number'; inp.step = type === 'int' ? '1' : 'any'; inp.value = cfg[k]; }
+      if (dep) { lab.classList.add('sub'); deps.push([dep, lab, inp]); }
       form.appendChild(lab); form.appendChild(inp);
     }
+    // 依存項目: チェックボックスの状態に応じて表示（'!k' はオフのとき表示）
+    const upd = () => {
+      for (const [dep, lab, inp] of deps) {
+        const neg = dep[0] === '!', on = $('#cf_' + dep.replace('!', '')).checked !== neg;
+        lab.hidden = inp.hidden = !on;
+      }
+    };
+    for (const dep of new Set(deps.map((d) => d[0].replace('!', '')))) $('#cf_' + dep).addEventListener('change', upd);
+    upd();
   }
   function readForm() {
     const cfg = Object.assign({}, GC.DEFAULTS, { ratioTolPct: 0 });
