@@ -64,14 +64,17 @@
     pressureAngleDeg: 20,
     addendum: 1.0,          // 歯末の丈係数
     dedendum: 1.25,         // 歯元の丈係数
-    // かみ合い干渉・転位（選択した解の詳細表示用。探索の候補は弾かない）
-    shiftMode: 'none',      // 'none' 標準 / 'auto' 干渉しない最小の高低転位 / 'manual' 手動
-    xRB: 0,                 // 手動: 赤・青 +x（緑一層目 −x）
-    xG2: 0,                 // 手動: 緑二層目・黄 +x（中心距離は不変）
+    // かみ合い干渉・転位・バックラッシ（中心距離は転位とバックラッシを含めて計算し, 配置を解き直す）
+    // meshOpt オン: 転位（高低・角転位）を自動で決め, バックラッシ込みの中心距離で配置を解き直す。
+    //   かみ合いの条件（干渉なし・歯先厚さ・かみ合い率・頂げき）を満たさない候補は除外
+    // オフ: 標準歯形・標準中心距離（かみ合いの条件は判定の表示のみ）
+    meshOpt: true,
     xMaxAuto: 1.0,          // 自動転位の上限
-    tipMinM: 0.25,          // 歯先厚さの目安下限 [×m]
-    tipMinMM: 0.8,          // 歯先厚さの目安下限 [mm]（FDM ノズル 0.4 × 2 本）
-    epsMin: 1.2,            // かみ合い率の目安下限
+    backlash: 0.1,          // 法線方向バックラッシ jn [mm]（中心距離をずらしてつける）
+    tipMinM: 0.25,          // 歯先厚さの下限 [×m]
+    tipMinMM: 0.8,          // 歯先厚さの下限 [mm]（FDM ノズル 0.4 × 2 本）
+    epsMin: 1.2,            // かみ合い率の下限
+    clrTipM: 0.1,           // 頂げき（歯先 ↔ 相手の歯底）の下限 [×m]
     zMin: 12,               // 最小歯数
     zMaxRed: 60,
     zMaxBlue: 100,
@@ -224,75 +227,145 @@
     const a = (cfg.pressureAngleDeg * Math.PI) / 180;
     return g.internal ? tipThickInt(g, a) : tipThickExt(g, a);
   }
-  // p: 小歯車, q: 相手（外歯車 or 内歯車）。かみ合い率と干渉（相手の歯先が小歯車の基礎円より内側に入る等）
-  function meshCalc(p, q, cfg) {
-    const a = (cfg.pressureAngleDeg * Math.PI) / 180, pb = Math.PI * p.m * Math.cos(a);
+  // 逆インボリュート（Newton 法）
+  function invInv(v) {
+    let t = Math.cbrt(3 * v);
+    for (let i = 0; i < 30; i++) {
+      const c = Math.cos(t), dt = (Math.tan(t) - t - v) / (1 / (c * c) - 1);
+      t -= dt;
+      if (Math.abs(dt) < 1e-13) break;
+    }
+    return t;
+  }
+  // 転位・バックラッシを含む中心距離
+  //   外歯車対: inv αw = 2 tanα (x1 + x2)/(z1 + z2) + inv α,  a = (z1 + z2) m/2 · cosα / cosαw。バックラッシは a を広げる
+  //   内歯車対: inv αw = 2 tanα (x2 − x1)/(z2 − z1) + inv α,  a = (z2 − z1) m/2 · cosα / cosαw。バックラッシは a を縮める
+  //   法線方向バックラッシ jn = 2 Δa sinαw
+  function centerDist(cfg, p, q) {
+    const al = (cfg.pressureAngleDeg * Math.PI) / 180;
+    const zs = q.internal ? q.z - p.z : q.z + p.z, xs = q.internal ? q.x - p.x : q.x + p.x;
+    const a0 = (zs * p.m) / 2;
+    const aw = invInv((2 * Math.tan(al) * xs) / zs + inv(al));
+    const aTight = (a0 * Math.cos(al)) / Math.cos(aw);
+    const da = (cfg.meshOpt ? cfg.backlash || 0 : 0) / (2 * Math.sin(aw));
+    return { a0, aTight, a: q.internal ? aTight - da : aTight + da };
+  }
+  // p: 小歯車, q: 相手（外歯車 or 内歯車）, a: 中心距離。かみ合い率・干渉・頂げき
+  //   干渉 = 相手の歯先が小歯車の基礎円より内側（インボリュートでない部分）に入る
+  function meshCalc(p, q, cfg, a) {
+    const al = (cfg.pressureAngleDeg * Math.PI) / 180, pb = Math.PI * p.m * Math.cos(al);
+    if (a == null) a = q.internal ? (q.d - p.d) / 2 : (q.d + p.d) / 2;
     const sq = (ra, rb) => Math.sqrt(Math.max(0, ra * ra - rb * rb));
     const g1 = sq(p.da / 2, p.db / 2), g2 = sq(q.da / 2, q.db / 2);
+    const cw = (q.internal ? q.db - p.db : q.db + p.db) / (2 * a);
+    const L = a * Math.sqrt(Math.max(0, 1 - cw * cw));   // a·sinαw = 両基礎円の接点間の距離
+    const aw = Math.acos(Math.min(1, cw));
     if (!q.internal) {
-      const L = ((p.d + q.d) / 2) * Math.sin(a);
       const intfP = g2 > L + 1e-9, intfQ = g1 > L + 1e-9;
-      return { internal: false, eps: (g1 + g2 - L) / pb, epsRelief: (Math.min(g1, L) + Math.min(g2, L) - L) / pb,
-        intf: intfP || intfQ, intfP, intfQ };
+      const clr = Math.min(a - p.da / 2 - q.df / 2, a - q.da / 2 - p.df / 2);
+      return { internal: false, a, aw, eps: (g1 + g2 - L) / pb, epsRelief: (Math.min(g1, L) + Math.min(g2, L) - L) / pb,
+        intf: intfP || intfQ, intfP, intfQ, clr };
     }
-    const L = ((q.d - p.d) / 2) * Math.sin(a);
     const below = q.da / 2 <= q.db / 2;          // 内歯車の歯先が自身の基礎円より内側
     const intfP = below || g2 < L - 1e-9;
-    return { internal: true, eps: (L + g1 - g2) / pb, epsRelief: (L + g1 - Math.max(g2, L)) / pb, intf: intfP, intfP, intfQ: false };
+    const clr = Math.min(q.df / 2 - a - p.da / 2, q.da / 2 - a - p.df / 2);
+    return { internal: true, a, aw, eps: (L + g1 - g2) / pb, epsRelief: (L + g1 - Math.max(g2, L)) / pb, intf: intfP, intfP, intfQ: false, clr };
   }
-  // 干渉しない最小の転位係数（0.01 刻み）。見つからなければ null
-  function needShift(m, z1, z2, internal, cfg) {
-    for (let i = 0; i <= Math.round(cfg.xMaxAuto * 100); i++) {
-      const x = i / 100;
-      const p = gearDims(m, z1, false, cfg, x), q = gearDims(m, z2, internal, cfg, internal ? x : -x);
-      if (!meshCalc(p, q, cfg).intf) return x;
+  function tipLim(cfg, g) { return Math.max(cfg.tipMinM * g.m, cfg.tipMinMM); }
+  // かみ合いの条件: 干渉なし・両歯車の歯先厚さ・かみ合い率・頂げき
+  //   干渉・頂げきはバックラッシ 0 の中心距離（厳しい側）, かみ合い率はバックラッシ込みの中心距離（厳しい側）で判定
+  function meshCheck(cfg, p, q) {
+    const c = centerDist(cfg, p, q), mc = meshCalc(p, q, cfg, c.a), mt = meshCalc(p, q, cfg, c.aTight);
+    Object.assign(mc, { intf: mt.intf, intfP: mt.intfP, intfQ: mt.intfQ, clr: mt.clr });
+    const tp = tipThick(p, cfg), tq = tipThick(q, cfg);
+    const fails = [];
+    if (mc.intf) fails.push('干渉');
+    if (!(tp >= tipLim(cfg, p)) || !(tq >= tipLim(cfg, q))) fails.push('歯先厚さ');
+    if (!(mc.eps >= cfg.epsMin)) fails.push('かみ合い率');
+    if (!(mc.clr >= cfg.clrTipM * p.m)) fails.push('頂げき');
+    return Object.assign(mc, { a0: c.a0, aTight: c.aTight, tp, tq, fails, ok: !fails.length });
+  }
+  // 自動転位: 条件を満たし, 転位係数の二乗和が最小の組（0.01 刻み, 結果はキャッシュ）。見つからなければ null
+  //   外歯車対: 小歯車 xp ≥ 0, 相手 xq ≤ 0 の範囲（xq = −xp が高低転位, xq = 0 が小歯車だけの角転位, その間も含む）
+  //   内歯車対: 小歯車 xp ≥ 0, 黄 xq ≥ xp（xq = xp が高低転位, xq > xp が角転位）
+  //   fixQ / fixP: 相手 / 小歯車の x を固定（緑一層目を青側で決めたあとの赤, 一層構造の緑）
+  const shiftCache = new Map();
+  function autoShift(cfg, m, zp, zq, internal, fixP, fixQ) {
+    const key = [cfg.pressureAngleDeg, cfg.addendum, cfg.dedendum, cfg.xMaxAuto, cfg.backlash, cfg.tipMinM, cfg.tipMinMM, cfg.epsMin, cfg.clrTipM,
+      m, zp, zq, internal, fixP, fixQ].join(',');
+    if (shiftCache.has(key)) return shiftCache.get(key);
+    const N = Math.round(cfg.xMaxAuto * 100);
+    const ok = (xp, xq) => meshCheck(cfg, gearDims(m, zp, false, cfg, xp), gearDims(m, zq, internal, cfg, xq)).ok;
+    let r = null, cost = Infinity;
+    const P = fixP != null ? [Math.round(fixP * 100)] : Array.from({ length: N + 1 }, (_, i) => i);
+    for (const i of P) {
+      const xp = i / 100;
+      if (xp * xp >= cost) break;
+      // 相手の x: |xq| の小さい順に試し, 最初に成立したものがこの xp での最小
+      const Q = fixQ != null ? [Math.round(fixQ * 100)] : internal ? Array.from({ length: 2 * N - i + 1 }, (_, k) => i + k) : Array.from({ length: N + 1 }, (_, k) => (k ? -k : 0));
+      for (const j of Q) {
+        const xq = j / 100, c = xp * xp + xq * xq;
+        if (c >= cost) break;
+        if (ok(xp, xq)) { r = { xp, xq }; cost = c; break; }
+      }
     }
-    return null;
+    if (shiftCache.size > 200000) shiftCache.clear();
+    shiftCache.set(key, r);
+    return r;
   }
-  // 各歯車の転位係数（二層構造のみ対応。一層では緑が両方のかみ合いに共通なので 0）
+  // 各歯車の転位係数。fail: 条件を満たす転位が見つからなかったかみ合い
+  //   緑一層目は赤・青に共通 → 青 ↔ 緑一層目 で決め（赤歯数に依存させない）, 赤はその緑に合わせる
   function shifts(cfg, s, layered) {
-    if (!cfg.shiftMode || cfg.shiftMode === 'none' || !layered) return { xR: 0, xB: 0, xG1: 0, xG2: 0, xY: 0 };
-    let xRB, xG2;
-    if (cfg.shiftMode === 'manual') { xRB = cfg.xRB; xG2 = cfg.xG2; } else {
-      const nr = needShift(s.m1, s.zr, s.zg1, false, cfg), nb = needShift(s.m1, s.zb, s.zg1, false, cfg);
-      xRB = Math.max(nr == null ? cfg.xMaxAuto : nr, nb == null ? cfg.xMaxAuto : nb);
-      const ng = needShift(s.m2, s.zg2, s.zy, true, cfg);
-      xG2 = ng == null ? cfg.xMaxAuto : ng;
+    const X = { xR: 0, xB: 0, xG1: 0, xG2: 0, xY: 0, fail: [] };
+    if (!cfg.meshOpt) return X;
+    if (layered) {
+      const b = autoShift(cfg, s.m1, s.zb, s.zg1, false);
+      if (b) { X.xB = b.xp; X.xG1 = b.xq; } else X.fail.push('B–G1');
+      const r = autoShift(cfg, s.m1, s.zr, s.zg1, false, null, X.xG1);
+      if (r) X.xR = r.xp; else X.fail.push('R–G1');
+      const y = autoShift(cfg, s.m2, s.zg2, s.zy, true);
+      if (y) { X.xG2 = y.xp; X.xY = y.xq; } else X.fail.push('G2–Y');
+    } else {
+      // 一層: 緑が 3 つのかみ合いに共通 → 緑 x = 0 とし, 赤・青・黄を合わせる
+      const b = autoShift(cfg, s.m1, s.zb, s.zg1, false, null, 0), r = autoShift(cfg, s.m1, s.zr, s.zg1, false, null, 0);
+      const y = autoShift(cfg, s.m2, s.zg2, s.zy, true, 0);
+      if (b) X.xB = b.xp; else X.fail.push('B–G1');
+      if (r) X.xR = r.xp; else X.fail.push('R–G1');
+      if (y) X.xY = y.xq; else X.fail.push('G2–Y');
     }
-    return { xR: xRB, xB: xRB, xG1: -xRB, xG2, xY: xG2 };
+    return X;
   }
-  // 選択した解のかみ合い情報（標準と現在の転位の両方）と歯先厚さ
+  // 選択した解のかみ合い情報（標準歯形と現在の転位）と歯先厚さ
   function meshReport(cfg, s, D) {
-    const std = derive(Object.assign({}, cfg, { shiftMode: 'none' }), s);
+    const std = derive(Object.assign({}, cfg, { meshOpt: false }), s);
     const g1 = D.layered ? '緑一層目' : '緑', g2 = D.layered ? '緑二層目' : '緑';
     const pairs = [['R–G1', '赤 ↔ ' + g1, 'R', 'G1'], ['B–G1', '青 ↔ ' + g1, 'B', 'G1'], ['G2–Y', g2 + ' ↔ 黄（内歯車）', 'G2', 'Y']];
     const meshes = pairs.map(([id, name, a, b]) => ({
-      id, name, p: D[a], q: D[b], std: meshCalc(std[a], std[b], cfg), cur: meshCalc(D[a], D[b], cfg),
-      need: needShift(D[a].m, D[a].z, D[b].z, D[b].internal, cfg),
+      id, name, p: D[a], q: D[b], std: std.mesh[id], cur: D.mesh[id], fail: D.shiftFail.includes(id),
     }));
     const tips = {};
     for (const k of ['R', 'B', 'G1', 'G2', 'Y']) {
-      const t = tipThick(D[k], cfg), lim = Math.max(cfg.tipMinM * D[k].m, cfg.tipMinMM);
+      const t = tipThick(D[k], cfg), lim = tipLim(cfg, D[k]);
       tips[k] = { t, lim, ok: t >= lim };
     }
-    return { meshes, tips, singleLayerNoShift: !D.layered && cfg.shiftMode && cfg.shiftMode !== 'none' };
+    return { meshes, tips };
   }
 
 
-  // 解（歯車の組）→ 各寸法・中心距離
+  // 解（歯車の組）→ 各寸法・中心距離（転位・バックラッシ込み）
   function derive(cfg, s) {
     const layered = !(s.m1 === s.m2 && s.zg1 === s.zg2);
     const X = shifts(cfg, s, layered);
     const R = gearDims(s.m1, s.zr, false, cfg, X.xR);
     const B = gearDims(s.m1, s.zb, false, cfg, X.xB);
     const G1 = gearDims(s.m1, s.zg1, false, cfg, X.xG1);
-    const G2 = gearDims(s.m2, s.zg2, false, cfg, X.xG2);
+    const G2 = layered ? gearDims(s.m2, s.zg2, false, cfg, X.xG2) : G1;
     const Y = gearDims(s.m2, s.zy, true, cfg, X.xY);
+    const mesh = { 'R–G1': meshCheck(cfg, R, G1), 'B–G1': meshCheck(cfg, B, G1), 'G2–Y': meshCheck(cfg, G2, Y) };
     return {
-      R, B, G1, G2, Y, layered,
-      aGY: (s.m2 * (s.zy - s.zg2)) / 2,
-      aGB: (s.m1 * (s.zg1 + s.zb)) / 2,
-      aGR: (s.m1 * (s.zg1 + s.zr)) / 2,
+      R, B, G1, G2, Y, layered, mesh, shiftFail: X.fail,
+      meshOk: !X.fail.length && Object.values(mesh).every((c) => c.ok),
+      aGY: mesh['G2–Y'].a, aGB: mesh['B–G1'].a, aGR: mesh['R–G1'].a,
       ratio: (s.zg1 * s.zy) / (s.zb * s.zg2),
     };
   }
@@ -330,11 +403,18 @@
     const D = derive(cfg, s);
     const P = positions(cfg, s, D, pl);
     const items = [];
-    const add = (id, label, slack, note) => items.push({ id, label, slack, note: note || '' });
+    const add = (id, label, slack, note) => items.push({ id, label, slack, note: note || '', flag: id === 'C12' });   // flag: 成否のみ（余裕の値なし）
 
     add('C2', '黄 歯底円直径 ≤ ' + cfg.yellowRootMax, cfg.yellowRootMax - D.Y.df, 'df = ' + D.Y.df.toFixed(3));
     add('C6a', '内歯車 歯数差 ≥ ' + cfg.internalMinDiff, s.zy - s.zg2 - cfg.internalMinDiff, 'z差 = ' + (s.zy - s.zg2));
     add('C6b', '黄 歯先円 > 基礎円', (D.Y.da - D.Y.db) / 2, '');
+    if (cfg.meshOpt) {
+      for (const [id, c] of Object.entries(D.mesh)) {
+        const fail = D.shiftFail.includes(id);
+        add('C12', 'かみ合い ' + id + '（干渉・歯先厚さ・かみ合い率・頂げき）', fail || !c.ok ? -1 : 0,
+          fail ? '条件を満たす転位なし（上限 ' + cfg.xMaxAuto + '）' : c.ok ? 'OK（ε ' + c.eps.toFixed(2) + '）' : c.fails.join('・') + ' NG');
+      }
+    }
     if (!P) {
       add('GEO', '緑の配置（青 x に対する解なし）', -1, '');
       return { D, P: null, items, minSlack: -1, ok: false };
@@ -385,7 +465,7 @@
     let minSlack = Infinity, ok = true;
     for (const it of items) {
       if (it.slack < -1e-9) ok = false;
-      if (!/^C2|^C6/.test(it.id) && it.slack < minSlack) minSlack = it.slack;
+      if (!/^C2|^C6|^C12/.test(it.id) && it.slack < minSlack) minSlack = it.slack;
     }
     return { D, P, items, minSlack, ok };
   }
@@ -494,8 +574,15 @@
   // 1 つの歯車組（赤以外）について, 成立する赤歯数と最良配置を探す
   function solveCombo(cfg, c, field) {
     const base = { m1: c.m1, m2: c.m2, zr: cfg.zMin, zb: c.zb, zg1: c.zg1, zg2: c.zg2, zy: c.zy };
-    // 探索は標準歯形の寸法で行う（転位は選択した解の詳細でのみ反映）
-    const D = derive(Object.assign({}, cfg, { shiftMode: 'none' }), base);
+    // 寸法・中心距離は転位・バックラッシ込み（赤以外の寸法・中心距離は赤歯数に依存しない）
+    const D = derive(cfg, base);
+    if (cfg.meshOpt && (D.shiftFail.some((id) => id !== 'R–G1') || !D.mesh['B–G1'].ok || !D.mesh['G2–Y'].ok)) return null;
+    // 転位で変わる単体条件（黄の歯底円, 内歯車の成立, 緑一層目の最外点）
+    if (D.Y.df > cfg.yellowRootMax || D.Y.da <= D.Y.db) return null;
+    if (D.layered) {
+      const reach = D.aGY + D.G1.da / 2;
+      if (cfg.green1InYellow ? reach > D.Y.da / 2 - cfg.clrGear : reach > cfg.green1OuterMax) return null;
+    }
     // 青・緑の配置候補
     const cands = [];
     for (let xb = cfg.xbMin; xb <= cfg.xbMax + 1e-9; xb += cfg.xbStep) {
@@ -518,12 +605,15 @@
       for (let k = 0; k < K - 1; k++) pick.push(cands[Math.round((k * (cands.length - 1)) / (K - 2))]);
     }
     const rmax = (cfg.brownD - cfg.purpleD) / 2;
-    const zrLo = Math.max(cfg.zMin, Math.ceil((2 * (D.aGY - rmax)) / c.m1 - c.zg1 - 1e-9));
+    const zrLo = Math.max(cfg.zMin, Math.ceil((2 * (D.aGY - rmax)) / c.m1 - c.zg1 - 1e-9) - 1);   // −1: 転位で中心距離が広がる分
     const zrOk = [];
     let best = null;
+    const redDims = {};   // 赤歯数ごとの中心距離・歯先半径（転位込み）
     for (let zr = zrLo; zr <= cfg.zMaxRed; zr++) {
-      const aGR = (c.m1 * (c.zg1 + zr)) / 2;
-      const rR = (c.m1 * (zr + 2 * cfg.addendum)) / 2;
+      const Dr = derive(cfg, Object.assign({}, base, { zr }));
+      if (cfg.meshOpt && !Dr.meshOk) continue;
+      const aGR = Dr.aGR, rR = Dr.R.da / 2;
+      redDims[zr] = { aGR, rR };
       let zrBest = null;
       for (const p of pick) {
         for (const phi of redAngles(p.G, aGR, rmax, 13, cfg.redYRef, cfg.redYTol, redRmin(cfg), redXMin(cfg))) {
@@ -542,8 +632,7 @@
     // 赤の現在位置からの移動量が最小となる配置（全候補の青 x × 成立する赤歯数）
     let mv = null;
     for (const zr of zrOk) {
-      const aGR = (c.m1 * (c.zg1 + zr)) / 2;
-      const rR = (c.m1 * (zr + 2 * cfg.addendum)) / 2;
+      const { aGR, rR } = redDims[zr];
       for (const p of cands) {
         const phis = redAngles(p.G, aGR, rmax, 13, cfg.redYRef, cfg.redYTol, redRmin(cfg), redXMin(cfg));
         phis.push(Math.atan2(cfg.redYRef - p.G[1], cfg.redXRef - p.G[0])); // 円上で基準に最も近い点
@@ -702,6 +791,6 @@
   return {
     PX_PER_MM, PARTS, FIGURES, FIG2_REFERENCE, DEFAULTS,
     polyDist, pointInPoly, gearDims, derive, greenCenter, positions,
-    evaluate, redMove, meshReport, tipThick, needShift, enumerate, moduleList, solveCombo, createSearch, runSearch, optimizePlacement, getField,
+    evaluate, redMove, meshReport, tipThick, autoShift, centerDist, enumerate, moduleList, solveCombo, createSearch, runSearch, optimizePlacement, getField,
   };
 });

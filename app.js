@@ -12,6 +12,11 @@
   // 条件フォーム
   // ---------------------------------------------------------------------------
   const FIELDS = [
+    ['grp', 'かみ合い（干渉・転位・バックラッシ）'],
+    ['meshOpt', '転位・バックラッシを含めて最適化', 'switch'],
+    ['backlash', 'バックラッシ jn [mm]', 'num', 'meshOpt'], ['xMaxAuto', '転位係数の上限', 'num', 'meshOpt'],
+    ['tipMinM', '歯先厚さ 下限（m の倍数）', 'num'], ['tipMinMM', '歯先厚さ 下限 [mm]', 'num'], ['epsMin', 'かみ合い率 下限', 'num'],
+    ['clrTipM', '頂げき 下限（m の倍数）', 'num'],
     ['grp', '速度比（厳密一致）'],
     ['ratio', 'n青 / n黄', 'num'],
     ['grp', 'モジュール（任意値を刻みで走査）'],
@@ -19,10 +24,6 @@
     ['allowTwoLayer', '緑の二層構造を許可', 'bool'],
     ['grp', '歯形'],
     ['pressureAngleDeg', '圧力角 [°]', 'num'], ['addendum', '歯末の丈 係数', 'num'], ['dedendum', '歯元の丈 係数', 'num'],
-    ['grp', 'かみ合い干渉・転位（選んだ解の詳細に反映。探索の候補は弾かない）'],
-    ['shiftMode', '転位', 'sel', null, [['none', 'なし（標準）'], ['auto', '自動（干渉しない最小）'], ['manual', '手動']]],
-    ['xRB', '赤・青 の転位 +x（緑1 は −x）', 'num', 'shiftMode=manual'], ['xG2', '緑2・黄 の転位 +x', 'num', 'shiftMode=manual'],
-    ['tipMinM', '歯先厚さ 目安下限（m の倍数）', 'num'], ['tipMinMM', '歯先厚さ 目安下限 [mm]', 'num'], ['epsMin', 'かみ合い率 目安下限', 'num'],
     ['grp', '歯数'],
     ['zMin', '最小歯数', 'int'], ['zMaxRed', '赤 最大', 'int'], ['zMaxBlue', '青 最大', 'int'], ['zMaxGreen', '緑 最大', 'int'],
     ['internalMinDiff', '黄 − 緑二層目 最小差', 'int'],
@@ -53,12 +54,14 @@
     pressureAngleDeg: '圧力角 α。歯面の傾き。標準は 20°',
     addendum: '歯末の丈（基準円から歯先まで）= 係数 × m。標準は 1.0',
     dedendum: '歯元の丈（基準円から歯底まで）= 係数 × m。標準は 1.25',
-    shiftMode: '高低転位: 外歯車対は小歯車 +x・相手 −x，内歯車対は緑2・黄とも +x（中心距離は不変）。x は転位係数（無次元），転位量 = x × m [mm]',
-    xRB: '転位係数 x（無次元）。赤・青に +x，緑一層目に −x。転位量 = x × m1 [mm]',
-    xG2: '転位係数 x（無次元）。緑二層目・黄に +x。転位量 = x × m2 [mm]',
-    tipMinM: 'モジュールに対する倍率。例: 0.25 なら m = 1.6 で 0.25 × 1.6 = 0.4 mm。下の [mm] の値と大きい方を目安にする',
-    tipMinMM: '歯先厚さの目安下限 [mm]。FDM ではノズル径 0.4 mm × 2 本分 = 0.8 mm 程度',
+    meshOpt: 'オン: かみ合いごとに転位（高低転位・角転位）を自動で決め，転位とバックラッシを含めた中心距離で配置を解き直す。干渉なし・歯先厚さ・かみ合い率・頂げきを満たせない候補は除外。' +
+      'オフ: 標準歯形・標準の中心距離で探索（かみ合いは右の表で判定を見るだけ）',
+    backlash: '法線方向のバックラッシ jn [mm]。歯を薄くせず，中心距離をずらしてつける（外歯車対は広げ，内歯車対は縮める。jn = 2·Δa·sinαw）。m 1.5〜2 で精度の良い加工なら 0.05〜0.1 程度',
+    xMaxAuto: '自動で決める転位係数 x の絶対値の上限（黄は小歯車の x + この値まで）',
+    tipMinM: 'モジュールに対する倍率。例: 0.25 なら m = 1.6 で 0.25 × 1.6 = 0.4 mm。下の [mm] の値と大きい方を下限にする',
+    tipMinMM: '歯先厚さの下限 [mm]。上の倍率 × m と大きい方を使う',
     epsMin: 'かみ合い率 = 同時にかみ合う歯の組数の平均。1.2 以上が目安',
+    clrTipM: '頂げき = 歯先と相手の歯底のすき間。角転位で中心距離の広がりが転位量より小さいと狭くなる。標準歯形では 0.25 × m',
     zMin: 'すべての歯車に共通の最小歯数',
     zMaxRed: '赤の歯数の探索上限', zMaxBlue: '青の歯数の探索上限', zMaxGreen: '緑の歯数の探索上限',
     internalMinDiff: '内歯車の歯数差 z黄 − z緑2 の最小値。小さいと歯先同士が当たる（トロコイド干渉）',
@@ -91,7 +94,7 @@
     '速度比（厳密一致）': '青と黄の回転数の比。歯数の比で厳密に一致させる',
     'モジュール（任意値を刻みで走査）': 'モジュール m = 歯の大きさ（基準円直径 ÷ 歯数）[mm]。3D プリント・CNC 前提で任意の値を試す',
     '歯形': '歯の形（インボリュート歯形）のパラメータ',
-    'かみ合い干渉・転位（選んだ解の詳細に反映。探索の候補は弾かない）': '歯数が少ないと相手の歯先が歯元に食い込む（干渉）。転位で避けられる。ここの設定は右の詳細表示だけに反映',
+    'かみ合い（干渉・転位・バックラッシ）': '歯数が少ないと相手の歯先が歯元に食い込む（干渉）。転位で避けられる。スイッチをオンにすると探索に組み込む',
     '歯数': '歯数の探索範囲',
     '寸法 [mm]': '歯車・円の寸法や位置',
     'すき間 [mm]': '部品や歯車同士の最小すき間',
@@ -121,7 +124,9 @@
     intf: '相手の歯先が基礎円より内側（インボリュートでない部分）に入るか',
     eps: 'かみ合い率：同時にかみ合う歯の組数の平均。1.2 以上が目安',
     std: '転位なし（標準歯形）で作った場合の干渉とかみ合い率',
-    need: '干渉しないために小歯車に必要な最小の転位係数。転位量 = x × m [mm]',
+    ca: '中心距離 a [mm]（転位・バックラッシ込み）。( ) は標準歯形の中心距離',
+    clr: '頂げき [mm]：歯先と相手の歯底のすき間（バックラッシ 0 のとき）',
+    judge: 'かみ合いの条件（干渉なし・歯先厚さ・かみ合い率・頂げき）の判定',
     cons: '制約の ID と内容。余裕が小さい順に並ぶ',
     slack: '余裕 [mm]：その制約をあとどれだけ満たしているか。0 以上で成立，負なら不成立',
     note: '実際のすき間や値',
@@ -138,10 +143,11 @@
     C7a: '青の中心 x の範囲', C7b: '赤の中心 y の範囲',
     C8: 'モーター（紫円）と水色部品 P1・P3 のすき間', C9: 'モーター（紫円）と球のすき間',
     C10: 'モーター尻の円全体が制限線より右', C11: '青の歯先円とモーター（紫円）のすき間（メンテ性）',
+    C12: 'かみ合いの条件（干渉なし・歯先厚さ・かみ合い率・頂げき）。成否のみ，最小余裕には含めない',
     GEO: '青の x に対して緑の位置が決まらない',
   };
 
-  const STORE_KEY = 'gearsheet.cfg.v16';
+  const STORE_KEY = 'gearsheet.cfg.v17';
 
   function loadCfg() {
     let saved = {};
@@ -162,10 +168,17 @@
       if (FIELD_TIPS[k]) lab.title = FIELD_TIPS[k];
       const inp = document.createElement(type === 'sel' ? 'select' : 'input'); inp.id = 'cf_' + k; inp.dataset.k = k; inp.dataset.t = type;
       if (type === 'sel') { inp.innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join(''); inp.value = cfg[k]; }
-      else if (type === 'bool') { inp.type = 'checkbox'; inp.checked = !!cfg[k]; }
+      else if (type === 'bool' || type === 'switch') { inp.type = 'checkbox'; inp.checked = !!cfg[k]; }
       else { inp.type = 'number'; inp.step = type === 'int' ? '1' : 'any'; inp.value = cfg[k]; }
       if (FIELD_TIPS[k]) inp.title = FIELD_TIPS[k];
       if (dep) { lab.classList.add('sub'); deps.push([dep, lab, inp]); }
+      if (type === 'switch') {
+        // 大きいオンオフスイッチ: <label class="switch"><input><span class="track"></span><span class="st"></span></label>
+        lab.classList.add('switchLab');
+        const sw = document.createElement('label'); sw.className = 'switch'; if (FIELD_TIPS[k]) sw.title = FIELD_TIPS[k];
+        sw.appendChild(inp); sw.insertAdjacentHTML('beforeend', '<span class="track"></span><span class="st"></span>');
+        form.appendChild(lab); form.appendChild(sw); continue;
+      }
       form.appendChild(lab); form.appendChild(inp);
     }
     // 依存項目: 'k' = チェックでオン, '!k' = オフで表示, 'k=v' = 選択値が v で表示
@@ -184,7 +197,7 @@
     const cfg = Object.assign({}, GC.DEFAULTS, { ratioTolPct: 0 });
     for (const inp of document.querySelectorAll('#cfgForm input, #cfgForm select')) {
       const k = inp.dataset.k, t = inp.dataset.t;
-      cfg[k] = t === 'sel' ? inp.value : t === 'bool' ? inp.checked : t === 'int' ? parseInt(inp.value, 10) : parseFloat(inp.value);
+      cfg[k] = t === 'sel' ? inp.value : t === 'bool' || t === 'switch' ? inp.checked : t === 'int' ? parseInt(inp.value, 10) : parseFloat(inp.value);
     }
     return cfg;
   }
@@ -206,7 +219,7 @@
   function fig2Selection() {
     // 赤を現在位置 R0 に置き, 緑 = 「原点中心 半径 a緑黄」と「R0 中心 半径 a緑赤」の交点（図2 の緑に近い方）,
     // 青 = y = blueY 上で緑から a緑青 の点（図2 の青に近い方）として組み立てる
-    const cfg = state.cfg;
+    const cfg = Object.assign({}, state.cfg, { meshOpt: false });   // 現行設計は標準歯形
     const D = GC.derive(cfg, FIG2_SET);
     const ref = GC.FIG2_REFERENCE.center, R0 = [cfg.redXRef, cfg.redYRef];
     const near = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]);
@@ -350,7 +363,10 @@
   // ---------------------------------------------------------------------------
   // 選択中の解: 配置操作
   // ---------------------------------------------------------------------------
-  function viewCfg() { return state.sel && !state.sel.isRef && state.runCfg ? state.runCfg : state.cfg; }
+  function viewCfg() {
+    if (state.sel && state.sel.isRef) return Object.assign({}, state.cfg, { meshOpt: false });   // 現行設計（参考）は標準歯形
+    return state.sel && state.runCfg ? state.runCfg : state.cfg;
+  }
 
   function renderPlaceCtl() {
     const sel = state.sel, cfg = viewCfg();
@@ -422,30 +438,39 @@
     };
     $('#gearTable').innerHTML = `<tr><th title="${TIPS.ID}">ID</th><th title="${TIPS.m}">m</th><th title="${TIPS.z}">z</th><th title="${TIPS.x}">x</th><th title="${TIPS.d}">d</th><th title="${TIPS.da}">da</th><th title="${TIPS.df}">df</th><th title="${TIPS.tip}">歯先厚</th><th title="${TIPS.center}">中心 (x, y)</th></tr>` +
       rows.map(([id, nm, g, c]) => `<tr><td>${id} ${nm}</td><td>${g.m}</td><td>${g.z}</td><td title="転位係数 x = ${g.x.toFixed(2)} → 転位量 ${f3(g.x * g.m)} mm">${g.x ? (g.x > 0 ? '+' : '') + g.x.toFixed(2) : '0'}</td><td>${f3(g.d)}</td><td>${f3(g.da)}</td><td>${f3(g.df)}</td>${tipCell(id)}<td>${c ? `${f3(c[0])}, ${f3(c[1])}` : '–'}</td></tr>`).join('') +
-      `<tr><td colspan="9" class="muted" style="text-align:left" title="かみ合う 2 歯車の中心間の距離 [mm]。外歯車同士 = (d1 + d2)/2，内歯車 = (d黄 − d緑2)/2">中心距離: 緑–黄 ${f3(D.aGY)} / 緑–青 ${f3(D.aGB)} / 緑–赤 ${f3(D.aGR)}（高低転位なので転位しても不変）</td></tr>`;
+      `<tr><td colspan="9" class="muted" style="text-align:left" title="かみ合う 2 歯車の中心間の距離 [mm]。外歯車同士 = (d1 + d2)/2，内歯車 = (d黄 − d緑2)/2">中心距離: 緑–黄 ${f3(D.aGY)} / 緑–青 ${f3(D.aGB)} / 緑–赤 ${f3(D.aGR)}${viewCfg().meshOpt ? '（転位・バックラッシ込み）' : '（標準）'}</td></tr>`;
     renderMeshTable(MR);
   }
 
-  // かみ合いごとの干渉・かみ合い率・必要な転位（判定のみ。成立/不成立には含めない）
+  // かみ合いごとの中心距離・干渉・かみ合い率・頂げき・判定
   function renderMeshTable(MR) {
     const cfg = viewCfg();
     const yn = (b) => (b ? '<span class="ng">あり</span>' : '<span class="ok">なし</span>');
     const epsCell = (e) => `<span class="${e >= cfg.epsMin ? '' : 'ng'}">${f2(e)}</span>`;
     const xs = (g) => (g.x ? (g.x > 0 ? '+' : '') + g.x.toFixed(2) : '0');
-    $('#meshTable').innerHTML = `<tr><th title="${TIPS.mesh}">かみ合い</th><th title="${TIPS.mz}">z</th><th title="${TIPS.mx}">x</th><th title="${TIPS.intf}">干渉</th><th title="${TIPS.eps}">かみ合い率</th><th title="${TIPS.std}">標準歯形のとき</th><th title="${TIPS.need}">干渉しない最小 x</th></tr>` +
-      MR.meshes.map((m) => `<tr><td>${m.id} ${m.name}</td><td>${m.p.z} / ${m.q.z}</td><td title="転位量 ${f3(m.p.x * m.p.m)} / ${f3(m.q.x * m.q.m)} mm">${xs(m.p)} / ${xs(m.q)}</td>` +
-        `<td>${yn(m.cur.intf)}</td><td>${m.cur.intf ? `${epsCell(m.cur.epsRelief)}<span class="muted">（逃がし後）</span>` : epsCell(m.cur.eps)}</td>` +
-        `<td>${m.std.intf ? `干渉あり, 逃がし後 ε ${f2(m.std.epsRelief)}` : `干渉なし, ε ${f2(m.std.eps)}`}</td>` +
-        `<td>${m.need == null ? `<span class="ng">${cfg.xMaxAuto} 超</span>` : (m.need ? `<span title="転位量 ${f3(m.need * m.p.m)} mm">+${m.need.toFixed(2)}</span>` : '0（不要）')}</td></tr>`).join('');
+    $('#meshTable').innerHTML = `<tr><th title="${TIPS.mesh}">かみ合い</th><th title="${TIPS.mz}">z</th><th title="${TIPS.mx}">x</th><th title="${TIPS.ca}">中心距離</th><th title="${TIPS.intf}">干渉</th><th title="${TIPS.eps}">かみ合い率</th><th title="${TIPS.clr}">頂げき</th><th title="${TIPS.judge}">判定</th><th title="${TIPS.std}">標準歯形のとき</th></tr>` +
+      MR.meshes.map((m) => {
+        const c = m.cur;
+        const judge = m.fail ? `<span class="ng">転位なし（x ≤ ${cfg.xMaxAuto} で不可）</span>` : c.ok ? '<span class="ok">OK</span>' : `<span class="ng">${c.fails.join('・')}</span>`;
+        return `<tr><td>${m.id} ${m.name}</td><td>${m.p.z} / ${m.q.z}</td><td title="転位量 ${f3(m.p.x * m.p.m)} / ${f3(m.q.x * m.q.m)} mm">${xs(m.p)} / ${xs(m.q)}</td>` +
+          `<td title="かみ合い圧力角 ${f2((c.aw * 180) / Math.PI)}°">${f3(c.a)} <span class="muted">(${f3(c.a0)})</span></td>` +
+          `<td>${yn(c.intf)}</td><td>${c.intf ? `${epsCell(c.epsRelief)}<span class="muted">（逃がし後）</span>` : epsCell(c.eps)}</td>` +
+          `<td class="${c.clr >= cfg.clrTipM * m.p.m ? '' : 'ng'}">${f3(c.clr)}</td><td>${judge}</td>` +
+          `<td>${m.std.intf ? `干渉あり, 逃がし後 ε ${f2(m.std.epsRelief)}` : `干渉なし, ε ${f2(m.std.eps)}`}</td></tr>`;
+      }).join('');
     $('#meshNote').innerHTML = `干渉 = 相手の歯先が基礎円より内側（インボリュートでない部分）に入る。逃がし後 = その部分を削った場合（アンダーカット相当）のかみ合い率。` +
-      `x は転位係数（無次元）で，転位量 = x × m [mm]。転位は高低転位（外歯車対 x1 = −x2，内歯車対 x1 = x2）。赤・青は同じ x，緑一層目は −x。` +
-      (MR.singleLayerNoShift ? '<br><span class="ng">一層構造では緑が両方のかみ合いに共通のため転位は未対応（x = 0 で表示）</span>' : '');
+      `x は転位係数（無次元）で，転位量 = x × m [mm]。` +
+      (cfg.meshOpt ? `転位は自動（条件を満たし x の二乗和が最小）。外歯車対は 小歯車 +x・緑 −x〜0（高低転位〜角転位），内歯車対は 緑2 +x・黄 ≥ 緑2 の x。` +
+        `緑一層目の x は青とのかみ合いで決め，赤はそれに合わせる。バックラッシ jn = ${cfg.backlash} mm は中心距離で付与（干渉・頂げきはバックラッシ 0，かみ合い率はバックラッシ込みで判定）。`
+        : '<span class="ng">最適化オフ: 標準歯形・標準の中心距離（判定は表示のみ）</span>');
   }
 
   function renderConsTable() {
-    const items = state.ev.items.slice().sort((a, b) => a.slack - b.slack);
+    // 成否のみの項目（C12）は成立なら末尾, 不成立なら先頭
+    const key = (it) => (it.flag ? (it.slack < 0 ? -1e9 : 1e9) : it.slack);
+    const items = state.ev.items.slice().sort((a, b) => key(a) - key(b));
     $('#consTable').innerHTML = `<tr><th title="${TIPS.cons}">制約</th><th title="${TIPS.slack}">余裕</th><th title="${TIPS.note}">備考</th></tr>` +
-      items.map((it) => `<tr><td title="${CONS_TIPS[it.id] || ''}">${it.id} ${it.label}</td><td class="${it.slack >= -1e-9 ? 'ok' : 'ng'}">${f3(it.slack)}</td><td class="muted">${it.note}</td></tr>`).join('');
+      items.map((it) => `<tr><td title="${CONS_TIPS[it.id] || ''}">${it.id} ${it.label}</td><td class="${it.slack >= -1e-9 ? 'ok' : 'ng'}">${it.flag ? (it.slack >= 0 ? 'OK' : 'NG') : f3(it.slack)}</td><td class="muted">${it.note}</td></tr>`).join('');
   }
 
   // ---------------------------------------------------------------------------

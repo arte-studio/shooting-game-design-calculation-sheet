@@ -168,3 +168,16 @@ td.ok { color: var(--ok); } td.ng { color: var(--ng); font-weight: 600; }
   }
   #tabs button.on { color: var(--accent); border-top-color: var(--accent); font-weight: 600; }
 }
+
+/* 大きいオンオフスイッチ（転位・バックラッシの最適化） */
+.cfg label.switchLab { color: var(--fg); font-weight: 600; }
+.cfg label.switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+.cfg label.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.cfg label.switch .track { position: relative; width: 52px; height: 28px; border-radius: 14px; background: var(--line); transition: background .15s; flex: none; }
+.cfg label.switch .track::before { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.4); transition: left .15s; }
+.cfg label.switch input:checked + .track { background: var(--accent); }
+.cfg label.switch input:checked + .track::before { left: 27px; }
+.cfg label.switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cfg label.switch .st::before { content: 'OFF'; font-size: 12px; font-weight: 600; color: var(--muted); }
+.cfg label.switch input:checked ~ .st::before { content: 'ON'; color: var(--accent); }
