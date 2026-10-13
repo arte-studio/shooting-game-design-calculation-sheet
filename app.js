@@ -32,10 +32,10 @@
     ['green1OuterMax', '緑1 最外点の上限半径', 'num'],
     ['grp', '配置探索 [mm]'],
     ['clrPurplePart', '紫円 ↔ P1・P3 すき間', 'num'], ['ballD', '球 直径（黄の中心）', 'num'], ['clrPurpleBall', '紫円 ↔ 球 すき間', 'num'],
-    ['redYRef', '赤 中心 y 基準', 'num'], ['redYTol', '赤 中心 y 許容 ±', 'num'],
+    ['redXRef', '赤 現在位置 x（移動量の基準）', 'num'], ['redYRef', '赤 中心 y 基準（現在位置 y）', 'num'], ['redYTol', '赤 中心 y 許容 ±', 'num'],
     ['xbMin', '青 x 下限', 'num'], ['xbMax', '青 x 上限', 'num'], ['xbStep', '青 x 刻み', 'num'],
   ];
-  const STORE_KEY = 'gearsheet.cfg.v8';
+  const STORE_KEY = 'gearsheet.cfg.v9';
 
   function loadCfg() {
     let saved = {};
@@ -169,8 +169,8 @@
       const sel = state.sel && state.sel.src === r ? ' class="sel"' : '';
       const zrRange = r.zrList.length > 1 ? `<span class="muted">(${r.zrList[0]}–${r.zrList[r.zrList.length - 1]})</span>` : '';
       return `<tr data-i="${state.page * pp + i}"${sel}><td>${r.m1}</td><td>${r.m2}</td><td>${r.zr}${zrRange}</td><td>${r.zb}</td><td>${r.zg1}</td><td>${r.zg2}</td><td>${r.zy}</td>` +
-        `<td>${r.layered ? '二層' : '一層'}</td><td>${f3(r.ratioErrPct)}</td><td>${f2(r.yellowDf)}</td><td>${f2(r.score)}</td></tr>`;
-    }).join('') || '<tr><td colspan="11" class="muted" style="text-align:center">探索実行で結果を表示</td></tr>';
+        `<td>${r.layered ? '二層' : '一層'}</td><td>${f3(r.ratioErrPct)}</td><td>${f2(r.yellowDf)}</td><td>${f2(r.score)}</td><td>${f2(r.redMove)}</td></tr>`;
+    }).join('') || '<tr><td colspan="12" class="muted" style="text-align:center">探索実行で結果を表示</td></tr>';
   }
 
   function setTab(t) {
@@ -181,8 +181,10 @@
 
   function selectResult(r) {
     const cfg = state.runCfg;
-    const s = { m1: r.m1, m2: r.m2, zr: r.zr, zb: r.zb, zg1: r.zg1, zg2: r.zg2, zy: r.zy };
-    const best = GC.optimizePlacement(cfg, s, r.pl);
+    // 赤の移動量で並べているときは移動量最小の配置, それ以外は余裕最大の配置
+    const move = state.sort.k === 'redMove';
+    const s = { m1: r.m1, m2: r.m2, zr: move ? r.zrMove : r.zr, zb: r.zb, zg1: r.zg1, zg2: r.zg2, zy: r.zy };
+    const best = GC.optimizePlacement(cfg, s, move ? r.plMove : r.pl, move ? 'move' : 'slack');
     state.sel = { s, pl: best.pl, zrList: r.zrList, src: r, title: '探索結果', isRef: false };
     renderTable();
     renderSelection(true);
@@ -203,6 +205,7 @@
       <div class="full">
         <label><input type="checkbox" id="pcBr" ${sel.pl.branch > 0 ? 'checked' : ''}> 緑の分岐 +</label>
         <button id="pcOpt" type="button" class="ghost">余裕最大の配置にする</button>
+        <button id="pcMove" type="button" class="ghost">赤の移動最小の配置にする</button>
       </div>`;
     const upd = (fn) => (e) => { fn(e); renderSelection(false); };
     $('#pcZr').onchange = upd((e) => { sel.s.zr = +e.target.value; });
@@ -213,6 +216,10 @@
     $('#pcBr').onchange = upd((e) => { sel.pl.branch = e.target.checked ? 1 : -1; });
     $('#pcOpt').onclick = () => {
       const best = GC.optimizePlacement(cfg, sel.s, sel.pl);
+      sel.pl = best.pl; renderSelection(true);
+    };
+    $('#pcMove').onclick = () => {
+      const best = GC.optimizePlacement(cfg, sel.s, sel.pl, 'move');
       sel.pl = best.pl; renderSelection(true);
     };
   }
@@ -228,7 +235,8 @@
       <div>構造: ${D.layered ? '緑 二層' : '緑 一層'}　m1 = ${s.m1}, m2 = ${s.m2}</div>
       <div>速度比 z緑1·z黄 / (z青·z緑2) = ${s.zg1}·${s.zy} / (${s.zb}·${s.zg2}) = <b class="${ratioOk ? '' : 'ng'}">${D.ratio.toFixed(4)}</b>（目標 ${cfg.ratio}）</div>
       <div>回転方向: 赤と青は同方向, 青と黄は逆方向</div>
-      <div>最小余裕: <b>${f3(ev.minSlack)}</b> mm${sel.zrList ? `　赤 歯数の成立範囲: ${compactRanges(sel.zrList)}` : ''}</div>`;
+      <div>最小余裕: <b>${f3(ev.minSlack)}</b> mm${sel.zrList ? `　赤 歯数の成立範囲: ${compactRanges(sel.zrList)}` : ''}</div>
+      ${ev.P ? `<div>赤の移動量: <b>${f3(GC.redMove(cfg, ev.P.R))}</b> mm（現在位置 R0 (${cfg.redXRef}, ${cfg.redYRef}) から）</div>` : ''}`;
     if (rebuildCtl) renderPlaceCtl();
     renderGearTable();
     renderConsTable();
@@ -289,6 +297,7 @@
       shapes.push({ kind: 'poly', id: part.id, name: part.name, pts: part.poly, color: 'var(--part)', info: part.purpleOnly ? ['紫円（モーター）とだけ干渉判定'] : [] });
       part.poly.forEach((p, i) => shapes.push({ kind: 'point', id: `${part.id}.v${i}`, name: part.name + ' 頂点', p, color: 'var(--part)', draw: false }));
     }
+    shapes.push({ kind: 'point', id: 'R0', name: '赤 現在位置（移動量の基準）', p: [cfg.redXRef, cfg.redYRef], color: 'var(--red)', draw: true });
     shapes.push({ kind: 'hline', id: 'L.by', name: '青中心 y', y: cfg.blueY, color: 'var(--muted)' });
     state.shapes = shapes;
   }
@@ -350,7 +359,7 @@
     // ラベル
     if ($('#showLabels').checked && state.ev.P) {
       const P = state.ev.P;
-      for (const [p, t] of [[[0, 0], '黄 Y'], [P.G, 'G 緑'], [P.R, 'R 赤'], [P.B, 'B 青']]) {
+      for (const [p, t] of [[[0, 0], '黄 Y'], [P.G, 'G 緑'], [P.R, 'R 赤'], [P.B, 'B 青'], [[viewCfg().redXRef, viewCfg().redYRef], 'R0']]) {
         const [x, y] = toS(p); out.push(`<text class="lbl" x="${x + 6}" y="${y - 6}">${t}</text>`);
       }
       for (const part of GC.PARTS) {
@@ -404,6 +413,7 @@
     const sh = h.shape, p = h.p;
     const lines = [`<b>${sh.id}　${sh.name}</b>`];
     if (sh.kind === 'point') lines.push(`座標 (${f3(p[0])}, ${f3(p[1])})`);
+    if (sh.id === 'R0' && state.ev && state.ev.P) lines.push(`赤中心までの移動量 ${f3(GC.redMove(viewCfg(), state.ev.P.R))}`);
     if (sh.kind === 'circle') {
       lines.push(...(sh.info || []));
       lines.push(`直径 φ${f3(sh.r * 2)}（半径 ${f3(sh.r)}）`);

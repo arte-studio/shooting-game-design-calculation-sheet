@@ -82,6 +82,7 @@
     xbMin: 27,              // 青 中心 x の下限（図2 の青の位置 x≈27 より右）
     xbMax: 80,
     xbStep: 1.0,
+    redXRef: 39.1,          // 赤 中心の現在位置 x（図2・図4）。移動量の基準
     redYRef: 3.15,          // 赤 中心 y の基準（図2・図4 の赤の現在位置 (39.1, 3.15)）
     redYTol: 8,             // 赤 中心 y の許容幅 ±（基準からの相対）
     clrPurplePart: 0,       // 紫円 ↔ P1（レバー）・P3（上部ブロック）の最小すき間（被らなければよい）
@@ -314,6 +315,9 @@
     return s;
   }
 
+  // 赤中心の現在位置からの移動量
+  function redMove(cfg, R) { return Math.hypot(R[0] - cfg.redXRef, R[1] - cfg.redYRef); }
+
   // 赤中心の原点からの最小距離（紫円 ↔ 球）
   function redRmin(cfg) { return (cfg.purpleD + cfg.ballD) / 2 + cfg.clrPurpleBall; }
 
@@ -415,11 +419,28 @@
       }
     }
     if (!best) return null;
+    // 赤の現在位置からの移動量が最小となる配置（全候補の青 x × 成立する赤歯数）
+    let mv = null;
+    for (const zr of zrOk) {
+      const aGR = (c.m1 * (c.zg1 + zr)) / 2;
+      const rR = (c.m1 * (zr + 2 * cfg.addendum)) / 2;
+      for (const p of cands) {
+        const phis = redAngles(p.G, aGR, rmax, 13, cfg.redYRef, cfg.redYTol, redRmin(cfg));
+        phis.push(Math.atan2(cfg.redYRef - p.G[1], cfg.redXRef - p.G[0])); // 円上で基準に最も近い点
+        for (const phi of phis) {
+          const R = [p.G[0] + aGR * Math.cos(phi), p.G[1] + aGR * Math.sin(phi)];
+          const d = redMove(cfg, R);
+          if (mv && d >= mv.d) continue;
+          if (Math.min(p.s, slackR(cfg, D, field, R, p.B, rR)) >= 0) mv = { d, zr, xb: p.xb, branch: p.branch, phi };
+        }
+      }
+    }
     return {
       m1: c.m1, m2: c.m2, zr: best.zr, zb: c.zb, zg1: c.zg1, zg2: c.zg2, zy: c.zy,
       layered: D.layered, ratio: D.ratio, ratioErrPct: (D.ratio / cfg.ratio - 1) * 100,
       yellowDf: D.Y.df, zrList: zrOk, score: best.s,
       pl: { xb: best.xb, branch: best.branch, phi: best.phi },
+      redMove: mv.d, zrMove: mv.zr, plMove: { xb: mv.xb, branch: mv.branch, phi: mv.phi },
     };
   }
 
@@ -511,9 +532,16 @@
   // 配置の局所最適化（厳密評価で最小余裕を最大化）
   // ---------------------------------------------------------------------------
 
-  function optimizePlacement(cfg, s, pl0) {
+  // mode: 'slack' = 最小余裕を最大化 / 'move' = 全制約成立のもとで赤の移動量を最小化
+  function optimizePlacement(cfg, s, pl0, mode) {
     cfg = Object.assign({}, DEFAULTS, cfg);
-    const score = (pl) => { const e = evaluate(cfg, s, pl); return e.P ? e.minSlack : -1e9; };
+    const move = mode === 'move';
+    const score = (pl) => {
+      const e = evaluate(cfg, s, pl);
+      if (!e.P) return -1e9;
+      if (!move) return e.minSlack;
+      return e.ok ? 1e3 - redMove(cfg, e.P.R) : -1e3 + Math.min(0, e.minSlack) * 100;
+    };
     let best = { pl: Object.assign({}, pl0), v: score(pl0) };
     // 粗い全域探索（両分岐）
     const field = getField();
@@ -526,10 +554,13 @@
         if (!G) continue;
         const B = [xb, cfg.blueY];
         const sb = slackBG(cfg, D, field, B, G);
-        if (sb < best.v) continue;
-        for (const phi of redAngles(G, D.aGR, rmax, 37, cfg.redYRef, cfg.redYTol, redRmin(cfg))) {
+        if (move ? sb < 0 : sb < best.v) continue;
+        const phis = redAngles(G, D.aGR, rmax, 37, cfg.redYRef, cfg.redYTol, redRmin(cfg));
+        if (move) phis.push(Math.atan2(cfg.redYRef - G[1], cfg.redXRef - G[0]));
+        for (const phi of phis) {
           const R = [G[0] + D.aGR * Math.cos(phi), G[1] + D.aGR * Math.sin(phi)];
-          const v = Math.min(sb, slackR(cfg, D, field, R, B, rR));
+          const sr = Math.min(sb, slackR(cfg, D, field, R, B, rR));
+          const v = move ? (sr >= 0 ? 1e3 - redMove(cfg, R) : -1e9) : sr;
           if (v > best.v) { const pl = { xb, branch: br, phi }; const ve = score(pl); if (ve > best.v) best = { pl, v: ve }; }
         }
       }
@@ -551,6 +582,6 @@
   return {
     PX_PER_MM, PARTS, FIGURES, FIG2_REFERENCE, DEFAULTS,
     polyDist, pointInPoly, gearDims, derive, greenCenter, positions,
-    evaluate, enumerate, moduleList, solveCombo, createSearch, runSearch, optimizePlacement, getField,
+    evaluate, redMove, enumerate, moduleList, solveCombo, createSearch, runSearch, optimizePlacement, getField,
   };
 });
