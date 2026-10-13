@@ -26,7 +26,8 @@
     ['yellowRootMax', '黄 歯底円直径 上限', 'num'], ['blueY', '青 中心 y', 'num'], ['purpleD', '紫円 直径', 'num'], ['brownD', '茶円 直径', 'num'],
     ['grp', 'すき間 [mm]'],
     ['clrPart', '歯先円 ↔ 水色部品', 'num'], ['clrGear', '歯先円 ↔ 歯先円・軸', 'num'],
-    ['blueShaftD', '青 軸径（二層時の赤↔青判定）', 'num'],
+    ['redBlueTip', '赤 ↔ 青 歯先円を干渉させない（二層時も）', 'bool'],
+    ['blueShaftD', '青 軸径（上をオフ時の赤↔青判定）', 'num'],
     ['checkCrossLayer', '赤・青 が黄の歯先円内', 'bool'],
     ['green1InYellow', '緑1 も黄の歯先円内（二層時）', 'bool'],
     ['green1OuterMax', '緑1 最外点の上限半径', 'num'],
@@ -35,7 +36,7 @@
     ['redXRef', '赤 現在位置 x（移動量の基準）', 'num'], ['redYRef', '赤 中心 y 基準（現在位置 y）', 'num'], ['redYTol', '赤 中心 y 許容 ±', 'num'],
     ['xbMin', '青 x 下限', 'num'], ['xbMax', '青 x 上限', 'num'], ['xbStep', '青 x 刻み', 'num'],
   ];
-  const STORE_KEY = 'gearsheet.cfg.v9';
+  const STORE_KEY = 'gearsheet.cfg.v10';
 
   function loadCfg() {
     let saved = {};
@@ -289,7 +290,7 @@
       if (showRoot) shapes.push({ kind: 'circle', id: id + '.df', name: nm + ' 歯底円', c, r: g.df / 2, color: col, width: 1, dash: '2 3', info: base });
       if (id !== 'G2') shapes.push({ kind: 'point', id: id + '.c', name: nm + ' 中心', p: c, color: col, draw: true });
     }
-    if (P && D.layered) shapes.push({ kind: 'circle', id: 'B.shaft', name: '青 軸', c: P.B, r: cfg.blueShaftD / 2, color: 'var(--blue)', width: 1, dash: '', info: ['二層時は赤の歯先円とこの軸で干渉判定'] });
+    if (P && D.layered) shapes.push({ kind: 'circle', id: 'B.shaft', name: '青 軸', c: P.B, r: cfg.blueShaftD / 2, color: 'var(--blue)', width: 1, dash: '', info: [cfg.redBlueTip ? '赤 ↔ 青は歯先円同士で判定中' : '二層時は赤の歯先円とこの軸で干渉判定'] });
     shapes.push({ kind: 'circle', id: 'BR', name: '茶円', c: [0, 0], r: cfg.brownD / 2, color: 'var(--brown)', width: 1.5, dash: '', info: ['黄と同心'] });
     shapes.push({ kind: 'circle', id: 'BL', name: '球', c: [0, 0], r: cfg.ballD / 2, color: 'var(--brown)', width: 1.5, dash: '', info: ['黄の中心にある球（投影）'] });
     if (P) shapes.push({ kind: 'circle', id: 'PU', name: '紫円', c: P.R, r: cfg.purpleD / 2, color: 'var(--purple)', width: 1.5, dash: '', info: ['赤と同心'] });

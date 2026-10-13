@@ -76,6 +76,7 @@
     clrPart: 0.5,           // 歯先円 ↔ 水色部品 の最小すき間
     clrGear: 0.5,           // かみ合わない歯車同士の歯先円の最小すき間
     blueShaftD: 8,          // 青の軸径（二層構造時は赤 ↔ 青軸 で判定）
+    redBlueTip: true,       // 二層時も赤と青の歯先円同士を干渉させない（false: 赤 ↔ 青軸 のみ）
     checkCrossLayer: true,  // 赤・青の歯先円が黄の歯先円（内側）に収まるか
     green1InYellow: false,  // 二層時, 緑一層目の歯先円も黄の歯先円内に収めるか（false: 別の面なので外に出てよい）
     green1OuterMax: 90,     // 緑一層目 歯先の最外点の上限半径（外周ホイール 外径 φ179.8 相当）
@@ -223,7 +224,7 @@
 
   // 赤が避けるべき青側の半径（一層: 青の歯先円, 二層: 青の軸）
   function blueObstacleR(cfg, D) {
-    return D.layered ? cfg.blueShaftD / 2 : D.B.da / 2;
+    return D.layered && !cfg.redBlueTip ? cfg.blueShaftD / 2 : D.B.da / 2;
   }
 
   // ---------------------------------------------------------------------------
@@ -267,7 +268,7 @@
     // 一層: 赤・青が同一面 → 歯先円同士。二層: 赤は片持ちで青歯車とは別面 → 赤歯先円 ↔ 青の軸
     const dRB = Math.hypot(P.R[0] - P.B[0], P.R[1] - P.B[1]);
     const rBx = blueObstacleR(cfg, D);
-    add('C5a', D.layered ? '赤 歯先円 ↔ 青 軸φ' + cfg.blueShaftD : '赤 ↔ 青 歯先円', dRB - rR - rBx - cfg.clrGear,
+    add('C5a', D.layered && !cfg.redBlueTip ? '赤 歯先円 ↔ 青 軸φ' + cfg.blueShaftD : '赤 ↔ 青 歯先円', dRB - rR - rBx - cfg.clrGear,
       'すき間 ' + (dRB - rR - rBx).toFixed(3) + ' mm');
     if (cfg.checkCrossLayer) {
       const rYa = D.Y.da / 2;
