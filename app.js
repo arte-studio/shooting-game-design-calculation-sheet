@@ -84,8 +84,8 @@
   // ---------------------------------------------------------------------------
   // 状態
   // ---------------------------------------------------------------------------
-  // 現行設計（参考配置）: m = 1.2, 赤 12, 青 12, 緑 35（一層）, 黄 135 → 速度比 135/12 = 11.25（目標 15 に不一致）
-  const FIG2_SET = { m1: 1.2, m2: 1.2, zr: 12, zb: 12, zg1: 35, zg2: 35, zy: 135 };
+  // 現行設計（参考配置）: m = 1.2, 赤 12, 青 15, 緑 35（一層）, 黄 135 → 速度比 135/15 = 9（目標 15 に不一致）
+  const FIG2_SET = { m1: 1.2, m2: 1.2, zr: 12, zb: 15, zg1: 35, zg2: 35, zy: 135 };
   const state = {
     cfg: loadCfg(),       // フォームの値
     runCfg: null,         // 結果を出したときの条件
@@ -108,7 +108,7 @@
     const xb = [G[0] - w, G[0] + w].sort((a, b) => Math.abs(a - ref.blue[0]) - Math.abs(b - ref.blue[0]))[0];
     const branch = near(GC.greenCenter(D.aGY, D.aGB, xb, cfg.blueY, 1) || [1e9, 1e9], G) < 1e-6 ? 1 : -1;
     const phi = Math.atan2(R0[1] - G[1], R0[0] - G[0]);
-    return { s: Object.assign({}, FIG2_SET), pl: { xb, branch, phi }, zrList: null, title: '現行設計（参考, m = 1.2 / 速度比 11.25 のため不成立）', isRef: true };
+    return { s: Object.assign({}, FIG2_SET), pl: { xb, branch, phi }, zrList: null, title: '現行設計（参考, m = 1.2 / 速度比 9 のため不成立）', isRef: true };
   }
 
   // ---------------------------------------------------------------------------
