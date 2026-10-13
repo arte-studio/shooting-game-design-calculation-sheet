@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>歯車列 設計計算シート</title>
-<link rel="stylesheet" href="style.css?v=18">
+<link rel="stylesheet" href="style.css?v=19">
 </head>
 <body>
 <header>
   <h1>歯車列 設計計算シート</h1>
   <span class="sub">赤(駆動) → 緑(中間) → 青(出力1) / 黄(出力2, 内歯車)　n<sub>青</sub>:n<sub>黄</sub> = <span id="hdrRatio">15</span>:1</span>
-  <span id="ver" class="ver" title="更新日">v18 · 2026-10-13</span>
+  <span id="ver" class="ver" title="更新日">v19 · 2026-10-13</span>
 </header>
 
 <main>
@@ -33,12 +33,13 @@
         <label>m2 <select id="fM2"><option value="">全て</option></select></label>
         <label>構造 <select id="fLayer"><option value="">全て</option><option value="1">一層</option><option value="2">二層</option></select></label>
       </div>
+      <div id="sortCtl" class="filters"></div>
       <div class="tableWrap">
         <table id="resTable">
           <thead><tr>
             <th data-k="m1">m1</th><th data-k="m2">m2</th><th data-k="zr">z赤</th><th data-k="zb">z青</th>
             <th data-k="zg1">z緑1</th><th data-k="zg2">z緑2</th><th data-k="zy">z黄</th>
-            <th data-k="layered">層</th><th data-k="ratioErrPct">比誤差%</th><th data-k="yellowDf">黄df</th><th data-k="score">余裕</th><th data-k="redMove" title="赤中心の現在位置 R0 からの移動量 [mm]">赤移動</th>
+            <th data-k="layered">層</th><th data-k="ratioErrPct">比誤差%</th><th data-k="yellowDf">黄df</th><th data-k="score" title="最小余裕 [mm]: 配置に関わる全制約（部品・歯車・紫円などのすき間, 位置の範囲）のうち最も厳しいもののすき間。探索時の配置での概算値">余裕</th><th data-k="redMove" title="赤中心の現在位置 R0 からの移動量 [mm]">赤移動</th>
           </tr></thead>
           <tbody></tbody>
         </table>
@@ -97,7 +98,7 @@
   <button type="button" data-tab="right">詳細</button>
 </nav>
 
-<script src="gearcore.js?v=18"></script>
-<script src="app.js?v=18"></script>
+<script src="gearcore.js?v=19"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>

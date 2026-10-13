@@ -75,7 +75,7 @@
   const state = {
     cfg: loadCfg(),       // フォームの値
     runCfg: null,         // 結果を出したときの条件
-    results: [], view: [], sort: { k: 'default', dir: -1 }, page: 0, perPage: 100,
+    results: [], view: [], sort: [{ k: 'minM', dir: -1 }, { k: 'score', dir: -1 }], page: 0, perPage: 100,
     sel: null, ev: null,
     vp: { cx: 10, cy: 0, k: 4 },
     shapes: [], hover: null, meas: [], measA: null, cursor: null,
@@ -146,11 +146,37 @@
     let v = state.results.filter((r) =>
       (fm1 === '' || r.m1 === +fm1) && (fm2 === '' || r.m2 === +fm2) &&
       (fl === '' || (fl === '1' ? !r.layered : r.layered)));
-    const { k, dir } = state.sort;
-    if (k === 'default') v.sort((a, b) => Math.min(b.m1, b.m2) - Math.min(a.m1, a.m2) || b.score - a.score);
-    else v.sort((a, b) => dir * ((a[k] > b[k]) - (a[k] < b[k])) || b.score - a.score);
+    // 第1・第2優先で並べ, 同順位は余裕の大きい順
+    const keys = state.sort.filter((o) => o.k);
+    const cmp1 = ({ k, dir }) => (a, b) => { const x = sortVal(a, k), y = sortVal(b, k); return dir * ((x > y) - (x < y)); };
+    const cmps = keys.map(cmp1).concat([(a, b) => b.score - a.score]);
+    v.sort((a, b) => { for (const c of cmps) { const r = c(a, b); if (r) return r; } return 0; });
     state.view = v;
     renderTable();
+  }
+
+  // 並び替えのキー（表の列 + 小さい方の m）
+  const SORT_KEYS = [['minM', '小さい方の m'], ['m1', 'm1'], ['m2', 'm2'], ['zr', 'z赤'], ['zb', 'z青'], ['zg1', 'z緑1'], ['zg2', 'z緑2'], ['zy', 'z黄'],
+    ['layered', '層'], ['ratioErrPct', '比誤差%'], ['yellowDf', '黄df'], ['score', '余裕'], ['redMove', '赤移動']];
+  const DESC_FIRST = new Set(['minM', 'm1', 'm2', 'score']);   // 初回クリックで降順にするキー
+  const sortVal = (r, k) => (k === 'minM' ? Math.min(r.m1, r.m2) : k === 'layered' ? +r.layered : r[k]);
+
+  function buildSortCtl() {
+    const opts = (none) => (none ? '<option value="">なし</option>' : '') + SORT_KEYS.map(([k, l]) => `<option value="${k}">${l}</option>`).join('');
+    $('#sortCtl').innerHTML = [0, 1].map((i) =>
+      `<label>${i ? '②' : '並び替え ①'} <select id="sk${i}">${opts(i === 1)}</select></label>` +
+      `<select id="sd${i}" title="昇順 / 降順"><option value="-1">降順</option><option value="1">昇順</option></select>`).join('');
+    for (const i of [0, 1]) {
+      $('#sk' + i).onchange = (e) => {
+        const k = e.target.value;
+        state.sort[i] = { k, dir: DESC_FIRST.has(k) ? -1 : 1 };
+        state.page = 0; applyView();
+      };
+      $('#sd' + i).onchange = (e) => { state.sort[i].dir = +e.target.value; state.page = 0; applyView(); };
+    }
+  }
+  function syncSortCtl() {
+    for (const i of [0, 1]) { $('#sk' + i).value = state.sort[i].k; $('#sd' + i).value = String(state.sort[i].dir); $('#sd' + i).disabled = !state.sort[i].k; }
   }
 
   function renderTable() {
@@ -160,10 +186,11 @@
     $('#resCount').textContent = state.results.length ? `(${n.toLocaleString()} / ${state.results.length.toLocaleString()} 件)` : '';
     $('#pgInfo').textContent = `${state.page + 1} / ${pages}`;
     for (const th of document.querySelectorAll('#resTable th')) {
-      const on = th.dataset.k === state.sort.k;
-      th.classList.toggle('sorted', on);
-      th.dataset.dir = on ? (state.sort.dir > 0 ? ' ▲' : ' ▼') : '';
+      const i = state.sort.findIndex((o) => o.k && o.k === th.dataset.k);
+      th.classList.toggle('sorted', i >= 0);
+      th.dataset.dir = i >= 0 ? (state.sort[i].dir > 0 ? ' ▲' : ' ▼') + (i ? '②' : '①') : '';
     }
+    syncSortCtl();
     const rows = v.slice(state.page * pp, (state.page + 1) * pp);
     const tb = $('#resTable tbody');
     tb.innerHTML = rows.map((r, i) => {
@@ -183,7 +210,7 @@
   function selectResult(r) {
     const cfg = state.runCfg;
     // 赤の移動量で並べているときは移動量最小の配置, それ以外は余裕最大の配置
-    const move = state.sort.k === 'redMove';
+    const move = state.sort[0].k === 'redMove';
     const s = { m1: r.m1, m2: r.m2, zr: move ? r.zrMove : r.zr, zb: r.zb, zg1: r.zg1, zg2: r.zg2, zy: r.zy };
     const best = GC.optimizePlacement(cfg, s, move ? r.plMove : r.pl, move ? 'move' : 'slack');
     state.sel = { s, pl: best.pl, zrList: r.zrList, src: r, title: '探索結果', isRef: false };
@@ -719,10 +746,15 @@
     for (const id of ['#showTip', '#showRoot', '#showLabels']) $(id).onchange = () => { buildScene(); draw(); };
     for (const id of ['#fM1', '#fM2', '#fLayer']) $(id).onchange = () => { state.page = 0; applyView(); };
     for (const th of document.querySelectorAll('#resTable th')) {
-      th.onclick = () => {
-        const k = th.dataset.k;
-        state.sort = state.sort.k === k ? { k, dir: -state.sort.dir } : { k, dir: k === 'score' || k === 'm1' || k === 'm2' ? -1 : 1 };
-        applyView();
+      // クリック: 第1優先（同じ列なら昇降切替）, Shift+クリック: 第2優先
+      th.onclick = (e) => {
+        const k = th.dataset.k, i = e.shiftKey ? 1 : 0, cur = state.sort[i];
+        if (cur.k === k) cur.dir = -cur.dir;
+        else {
+          if (i === 0 && state.sort[1].k === k) state.sort[1] = { k: state.sort[0].k, dir: state.sort[0].dir };
+          state.sort[i] = { k, dir: DESC_FIRST.has(k) ? -1 : 1 };
+        }
+        state.page = 0; applyView();
       };
     }
     $('#resTable tbody').onclick = (e) => { const tr = e.target.closest('tr[data-i]'); if (!tr) return;
@@ -734,6 +766,7 @@
     $('#pgNext').onclick = () => { state.page++; renderTable(); };
 
     $('#btnShare').onclick = copyShare;
+    buildSortCtl();
 
     $('#bgSel').value = 'fig2';
     if (!loadShare()) state.sel = fig2Selection();
