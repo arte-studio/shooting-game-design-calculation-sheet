@@ -88,7 +88,7 @@
   const state = {
     cfg: loadCfg(),       // フォームの値
     runCfg: null,         // 結果を出したときの条件
-    results: [], view: [], sort: [{ k: 'minM', dir: -1 }, { k: 'score', dir: -1 }], page: 0, perPage: 100,
+    results: [], view: [], sort: [{ k: 'redMove', dir: 1 }, { k: 'minM', dir: -1 }], page: 0, perPage: 100,
     sel: null, ev: null,
     vp: { cx: 10, cy: 0, k: 4 },
     shapes: [], hover: null, meas: [], measA: null, cursor: null,
@@ -172,7 +172,8 @@
   const SORT_KEYS = [['minM', '小さい方の m'], ['m1', 'm1'], ['m2', 'm2'], ['zr', 'z赤'], ['zb', 'z青'], ['zg1', 'z緑1'], ['zg2', 'z緑2'], ['zy', 'z黄'],
     ['layered', '層'], ['ratioErrPct', '比誤差%'], ['yellowDf', '黄df'], ['score', '余裕'], ['redMove', '赤移動']];
   const DESC_FIRST = new Set(['minM', 'm1', 'm2', 'score']);   // 初回クリックで降順にするキー
-  const sortVal = (r, k) => (k === 'minM' ? Math.min(r.m1, r.m2) : k === 'layered' ? +r.layered : r[k]);
+  // 赤移動は探索の刻み（青 x 1 mm）による誤差があるので 0.1 mm 単位で比較し, 第2優先が効くようにする
+  const sortVal = (r, k) => (k === 'minM' ? Math.min(r.m1, r.m2) : k === 'layered' ? +r.layered : k === 'redMove' ? Math.round(r.redMove * 10) / 10 : r[k]);
 
   function buildSortCtl() {
     const opts = (none) => (none ? '<option value="">なし</option>' : '') + SORT_KEYS.map(([k, l]) => `<option value="${k}">${l}</option>`).join('');
