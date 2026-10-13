@@ -107,7 +107,7 @@
     ratioErrPct: '速度比の目標からの誤差 [%]（厳密一致なので 0）',
     yellowDf: '黄の歯底円直径 df [mm]（上限の条件あり）',
     score: '最小余裕 [mm]：配置に関わる全制約（部品・歯車・モーターなどのすき間, 位置の範囲）のうち最も厳しいもののすき間。探索時の配置での概算値',
-    redMove: '赤の中心の現在位置 R0 からの移動量 [mm]（移動が最小になる配置での値）',
+    redMove: '赤の中心の現在位置 R0 からの移動量 [mm]（移動が最小になる配置での値）。探索の刻みによる誤差があるので 0.1 mm 単位で表示・比較（同じ値どうしは並び替え②の順）。行を選ぶと詳細で正確な値が出る',
     ID: '歯車の ID と名前', m: 'モジュール（歯の大きさ。基準円直径 ÷ 歯数）[mm]', z: '歯数',
     x: '転位係数 x（無次元）。転位量 = x × m [mm]（セルにカーソルで表示）',
     d: '基準円直径 d = m × z [mm]。かみ合いの基準となる円',
@@ -326,7 +326,7 @@
       const sel = state.sel && state.sel.src === r ? ' class="sel"' : '';
       const zrRange = r.zrList.length > 1 ? `<span class="muted">(${r.zrList[0]}–${r.zrList[r.zrList.length - 1]})</span>` : '';
       return `<tr data-i="${state.page * pp + i}"${sel}><td>${r.m1}</td><td>${r.m2}</td><td>${move ? r.zrMove : r.zr}${zrRange}</td><td>${r.zb}</td><td>${r.zg1}</td><td>${r.zg2}</td><td>${r.zy}</td>` +
-        `<td>${r.layered ? '二層' : '一層'}</td><td>${f3(r.ratioErrPct)}</td><td>${f2(r.yellowDf)}</td><td>${f2(r.score)}</td><td>${f2(r.redMove)}</td></tr>`;
+        `<td>${r.layered ? '二層' : '一層'}</td><td>${f3(r.ratioErrPct)}</td><td>${f2(r.yellowDf)}</td><td>${f2(r.score)}</td><td>${(Math.round(r.redMove * 10) / 10).toFixed(1)}</td></tr>`;
     }).join('') || '<tr><td colspan="12" class="muted" style="text-align:center">探索実行で結果を表示</td></tr>';
   }
 
