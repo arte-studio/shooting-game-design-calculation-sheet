@@ -91,6 +91,7 @@ td.ok { color: var(--ok); } td.ng { color: var(--ng); font-weight: 600; }
 .placeCtl { display: grid; grid-template-columns: 70px 1fr 64px; gap: 4px 6px; align-items: center; margin-top: 8px; }
 .placeCtl input[type=range] { width: 100%; }
 .placeCtl .full { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
+.shareUrl { display: none; width: 100%; margin-bottom: 6px; font-size: 12px; }
 .badge { display: inline-block; padding: 0 6px; border-radius: 9px; font-size: 11px; border: 1px solid currentColor; }
 .badge.ok { color: var(--ok); } .badge.ng { color: var(--ng); }
 

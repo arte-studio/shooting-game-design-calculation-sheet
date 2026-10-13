@@ -594,6 +594,62 @@
   // ---------------------------------------------------------------------------
   // 初期化
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // 共有リンク: 条件（既定値との差分）と選択中の解・配置を URL の # に入れる
+  // ---------------------------------------------------------------------------
+  const b64e = (str) => btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const b64d = (str) => decodeURIComponent(escape(atob(str.replace(/-/g, '+').replace(/_/g, '/'))));
+
+  function shareUrl() {
+    const cfg = state.sel && !state.sel.isRef ? viewCfg() : readForm();
+    const c = {};
+    for (const k of Object.keys(GC.DEFAULTS)) if (cfg[k] !== GC.DEFAULTS[k]) c[k] = cfg[k];
+    const o = { v: 1, c, bg: $('#bgSel').value };
+    if (state.sel && !state.sel.isRef) {
+      const pl = state.sel.pl;
+      o.s = state.sel.s;
+      o.pl = { xb: +pl.xb.toFixed(4), branch: pl.branch, phi: +pl.phi.toFixed(6) };
+      if (state.sel.zrList) o.zr = state.sel.zrList;
+    }
+    return location.origin + location.pathname + '#share=' + b64e(JSON.stringify(o));
+  }
+
+  async function copyShare() {
+    const url = shareUrl(), msg = $('#shareMsg'), box = $('#shareUrl');
+    box.value = url;
+    // スマホは OS の共有シート（LINE・メールなど）を使う
+    if (navigator.share && matchMedia('(hover: none)').matches) {
+      try { await navigator.share({ title: document.title, url }); msg.textContent = ''; return; } catch (e) { if (e.name === 'AbortError') return; }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      msg.textContent = 'リンクをコピーしました' + (state.sel && !state.sel.isRef ? '（条件 + 選択中の解）' : '（条件のみ）');
+      box.style.display = 'none';
+    } catch (e) {
+      msg.textContent = '下のリンクをコピーしてください';
+      box.style.display = 'block'; box.select();
+    }
+  }
+
+  // 起動時に # の共有データを読み込む。成功したら true
+  function loadShare() {
+    const m = location.hash.match(/^#share=([A-Za-z0-9_-]+)$/);
+    if (!m) return false;
+    let o;
+    try { o = JSON.parse(b64d(m[1])); } catch (e) { alert('共有リンクを読み込めませんでした'); return false; }
+    state.cfg = Object.assign({}, GC.DEFAULTS, o.c || {}, { ratioTolPct: 0 });
+    saveCfg(state.cfg);
+    buildForm(state.cfg);
+    if (o.bg !== undefined && (o.bg === '' || GC.FIGURES[o.bg])) $('#bgSel').value = o.bg;
+    if (o.s && o.pl) {
+      state.runCfg = state.cfg;
+      state.sel = { s: o.s, pl: o.pl, zrList: o.zr || null, src: null, title: '共有された解', isRef: false };
+    }
+    // 読み込み後は # を消す（再読み込みで手元の変更が上書きされないように）
+    history.replaceState(null, '', location.pathname + location.search);
+    return !!state.sel;
+  }
+
   function init() {
     buildForm(state.cfg);
     $('#hdrRatio').textContent = state.cfg.ratio;
@@ -624,8 +680,11 @@
     $('#pgPrev').onclick = () => { state.page = Math.max(0, state.page - 1); renderTable(); };
     $('#pgNext').onclick = () => { state.page++; renderTable(); };
 
-    state.sel = fig2Selection();
+    $('#btnShare').onclick = copyShare;
+
     $('#bgSel').value = 'fig2';
+    if (!loadShare()) state.sel = fig2Selection();
+    else if (matchMedia('(max-width: 760px)').matches) setTab('center');
     renderTable();
     renderSelection(true);
     fit();
