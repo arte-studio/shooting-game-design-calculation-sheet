@@ -57,14 +57,14 @@
     ratio: 15,              // n_青 / n_黄
     ratioTolPct: 0,         // 比の許容誤差 [%]
     // 3Dプリント前提でモジュールは任意 → 下限〜上限を刻みで走査
-    modMin: 1.0,            // 1 以上が望ましい（0.5 以上必須。0.5 まで下げると探索は数分）
+    modMin: 1.5,            // 3Dプリント・CNC 前提で大きめ（0.5 以上必須）
     modMax: 2.0,
     modStep: 0.05,
     allowTwoLayer: true,    // 緑を二層構造にしてよいか
     pressureAngleDeg: 20,
     addendum: 1.0,          // 歯末の丈係数
     dedendum: 1.25,         // 歯元の丈係数
-    zMin: 17,               // 強度上の最小歯数
+    zMin: 12,               // 最小歯数
     zMaxRed: 60,
     zMaxBlue: 100,
     zMaxGreen: 200,
@@ -81,7 +81,7 @@
     green1InYellow: false,  // 二層時, 緑一層目の歯先円も黄の歯先円内に収めるか（false: 別の面なので外に出てよい）
     green1OuterMax: 90,     // 緑一層目 歯先の最外点の上限半径（外周ホイール 外径 φ179.8 相当）
     xbMin: 27,              // 青 中心 x の下限（図2 の青の位置 x≈27 より右）
-    xbMax: 80,
+    xbMax: 35,              // 青 中心 x の上限
     xbStep: 1.0,
     redXRef: 39.1,          // 赤 中心の現在位置 x（図2・図4）。移動量の基準
     redYRef: 3.15,          // 赤 中心 y の基準（図2・図4 の赤の現在位置 (39.1, 3.15)）
@@ -253,7 +253,7 @@
     }
     add('C9', '紫円 φ' + cfg.purpleD + ' ↔ 球 φ' + cfg.ballD, Math.hypot(P.R[0], P.R[1]) - (cfg.purpleD + cfg.ballD) / 2 - cfg.clrPurpleBall,
       'すき間 ' + (Math.hypot(P.R[0], P.R[1]) - (cfg.purpleD + cfg.ballD) / 2).toFixed(3) + ' mm');
-    add('C7a', '青 中心 x ≥ ' + cfg.xbMin, P.B[0] - cfg.xbMin, 'x = ' + P.B[0].toFixed(3));
+    add('C7a', '青 中心 x ∈ [' + cfg.xbMin + ', ' + cfg.xbMax + ']', Math.min(P.B[0] - cfg.xbMin, cfg.xbMax - P.B[0]), 'x = ' + P.B[0].toFixed(3));
     add('C7b', '赤 中心 y = ' + cfg.redYRef + ' ± ' + cfg.redYTol, cfg.redYTol - Math.abs(P.R[1] - cfg.redYRef), 'y = ' + P.R[1].toFixed(3));
 
     const gearsVsParts = [['R', '赤', P.R, rR], ['B', '青', P.B, rB], ['G1', '緑(一層目)', P.G, D.G1.da / 2]];

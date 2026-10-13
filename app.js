@@ -36,7 +36,7 @@
     ['redXRef', '赤 現在位置 x（移動量の基準）', 'num'], ['redYRef', '赤 中心 y 基準（現在位置 y）', 'num'], ['redYTol', '赤 中心 y 許容 ±', 'num'],
     ['xbMin', '青 x 下限', 'num'], ['xbMax', '青 x 上限', 'num'], ['xbStep', '青 x 刻み', 'num'],
   ];
-  const STORE_KEY = 'gearsheet.cfg.v10';
+  const STORE_KEY = 'gearsheet.cfg.v11';
 
   function loadCfg() {
     let saved = {};
@@ -595,15 +595,16 @@
   // 初期化
   // ---------------------------------------------------------------------------
   // ---------------------------------------------------------------------------
-  // 共有リンク: 条件（既定値との差分）と選択中の解・配置を URL の # に入れる
+  // 共有リンク: 条件（全項目）と選択中の解・配置を URL の # に入れる
   // ---------------------------------------------------------------------------
   const b64e = (str) => btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const b64d = (str) => decodeURIComponent(escape(atob(str.replace(/-/g, '+').replace(/_/g, '/'))));
 
   function shareUrl() {
     const cfg = state.sel && !state.sel.isRef ? viewCfg() : readForm();
+    // 既定値が将来変わっても同じ結果になるよう, 条件は全項目を入れる
     const c = {};
-    for (const k of Object.keys(GC.DEFAULTS)) if (cfg[k] !== GC.DEFAULTS[k]) c[k] = cfg[k];
+    for (const k of Object.keys(GC.DEFAULTS)) c[k] = cfg[k];
     const o = { v: 1, c, bg: $('#bgSel').value };
     if (state.sel && !state.sel.isRef) {
       const pl = state.sel.pl;
