@@ -335,6 +335,34 @@
     }
     return X;
   }
+  // 歯形の輪郭（中心基準の座標列, 閉じた折れ線）。インボリュート歯面 + 歯先・歯底の円弧
+  //   外歯車: phase = 歯の中心線の角度。内歯車: phase = 歯溝の中心線の角度（歯溝が外歯車の歯と同じ形）
+  //   基礎円より内側は半径方向の直線で近似（アンダーカット・歯元のすみ肉は描かない）
+  function toothOutline(g, cfg, phase, nFlank) {
+    nFlank = nFlank || 8;
+    const al = (cfg.pressureAngleDeg * Math.PI) / 180, r = g.d / 2, rb = g.db / 2, ra = g.da / 2, rf = g.df / 2;
+    const psi = (g.m * (Math.PI / 2 + 2 * g.x * Math.tan(al))) / (2 * r);   // 基準円上の歯（内歯車は歯溝）の半角
+    const half = (rho) => psi + inv(al) - (rho > rb ? inv(Math.acos(rb / rho)) : 0);   // 半径 rho での半角
+    // 歯面（内歯車は歯溝の面）は半径の小さい側 r1 から大きい側 r2 へ。
+    //   外歯車: r1 = 歯底, r2 = 歯先。内歯車: r1 = 歯先（内側, 歯溝が広い）, r2 = 歯底（外側, 歯溝が狭い）
+    const r1 = Math.min(ra, rf), r2 = Math.max(ra, rf);
+    const s0 = Math.min(Math.max(r1, rb), r2), flank = [];
+    if (s0 > r1) flank.push(r1);              // 基礎円より内側は直線（1 点）
+    for (let i = 0; i <= nFlank; i++) flank.push(s0 + ((r2 - s0) * i) / nFlank);
+    const pitch = (2 * Math.PI) / g.z, out = [];
+    const pt = (rho, th) => out.push([rho * Math.cos(th), rho * Math.sin(th)]);
+    const arc = (rho, t0, t1) => { const n = Math.max(1, Math.ceil(Math.abs(t1 - t0) / 0.05)); for (let i = 1; i < n; i++) pt(rho, t0 + ((t1 - t0) * i) / n); };
+    for (let k = 0; k < g.z; k++) {
+      const c = phase + k * pitch;
+      // 右側の歯面（角度の小さい側）: r1 → r2, 角度は c − half(ρ)
+      for (const rho of flank) pt(rho, c - half(rho));
+      arc(r2, c - half(r2), c + half(r2));
+      for (let i = flank.length - 1; i >= 0; i--) pt(flank[i], c + half(flank[i]));
+      arc(r1, c + half(r1), c + pitch - half(r1));
+    }
+    return out;
+  }
+
   // 選択した解のかみ合い情報（標準歯形と現在の転位）と歯先厚さ
   function meshReport(cfg, s, D) {
     const std = derive(Object.assign({}, cfg, { meshOpt: false }), s);
@@ -791,6 +819,6 @@
   return {
     PX_PER_MM, PARTS, FIGURES, FIG2_REFERENCE, DEFAULTS,
     polyDist, pointInPoly, gearDims, derive, greenCenter, positions,
-    evaluate, redMove, meshReport, tipThick, autoShift, centerDist, enumerate, moduleList, solveCombo, createSearch, runSearch, optimizePlacement, getField,
+    evaluate, redMove, meshReport, tipThick, autoShift, centerDist, toothOutline, enumerate, moduleList, solveCombo, createSearch, runSearch, optimizePlacement, getField,
   };
 });

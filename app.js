@@ -507,6 +507,38 @@
     shapes.push({ kind: 'point', id: 'R0', name: '赤 現在位置（移動量の基準）', p: [cfg.redXRef, cfg.redYRef], color: 'var(--red)', draw: true });
     shapes.push({ kind: 'hline', id: 'L.by', name: '青中心 y', y: cfg.blueY, color: 'var(--muted)' });
     state.shapes = shapes;
+    buildTeeth(cfg, D, P);
+  }
+
+  // 歯形の層: 選択が変わったときだけ作り, 描画のたびに座標変換（transform）だけ更新する
+  function buildTeeth(cfg, D, P) {
+    state.teethG = null;
+    if (!$('#showTeeth').checked || !P) return;
+    // かみ合う歯車どうしで歯と歯溝が向き合うように回転角を決める
+    //   黄: 歯溝の中心を緑の方向へ。緑2: 歯の中心を同じ方向へ。
+    //   緑1: 二層なら歯を青の方向へ（緑2 とは別の歯車なので自由）, 一層なら緑2 と同じ。
+    //   赤・青: 緑1 の歯の向きから, ころがり（回転角 × 歯数比）で決める
+    const ang = (a, b) => Math.atan2(b[1] - a[1], b[0] - a[0]);
+    const wrap = (t, p) => t - p * Math.round(t / p);
+    const beta = ang([0, 0], P.G);
+    const ph = { Y: beta, G2: beta, G1: D.layered ? ang(P.G, P.B) : beta };
+    for (const [id, c] of [['B', P.B], ['R', P.R]]) {
+      const g = D[id], gam = ang(P.G, c), p1 = (2 * Math.PI) / D.G1.z;
+      const eps = wrap(ph.G1 - gam, p1);   // 緑1 の最寄りの歯の, 中心線からのずれ
+      ph[id] = gam + Math.PI - (eps * D.G1.z) / g.z + Math.PI / g.z;   // 歯溝を緑1 の歯に向ける → 歯の中心は半ピッチ先
+    }
+    const list = [['Y', [0, 0], 'var(--yellow)'], ['G1', P.G, 'var(--green)']];
+    if (D.layered) list.push(['G2', P.G, 'var(--green2)']);
+    list.push(['R', P.R, 'var(--red)'], ['B', P.B, 'var(--blue)']);
+    const NS = 'http://www.w3.org/2000/svg';
+    const gEl = document.createElementNS(NS, 'g');
+    gEl.setAttribute('class', 'teeth');
+    gEl.innerHTML = list.map(([id, c, col]) => {
+      const pts = GC.toothOutline(D[id], cfg, ph[id], 8);
+      const d = 'M' + pts.map((q) => `${(q[0] + c[0]).toFixed(3)} ${(q[1] + c[1]).toFixed(3)}`).join('L') + 'Z';
+      return `<path d="${d}" style="stroke:${col};fill:${D[id].internal ? 'none' : col}" fill-opacity="0.12" stroke-width="1.2" vector-effect="non-scaling-stroke"/>`;
+    }).join('');
+    state.teethG = gEl;
   }
 
   // ---------------------------------------------------------------------------
@@ -566,6 +598,7 @@
     // 原点軸
     const [W, H] = size(), [ox, oy] = toS([0, 0]);
     out.push(`<line x1="0" x2="${W}" y1="${oy}" y2="${oy}" style="stroke:var(--grid)"/><line y1="0" y2="${H}" x1="${ox}" x2="${ox}" style="stroke:var(--grid)"/>`);
+    out.push('<g id="teethSlot"/>');   // ここに歯形の層を差し込む（図形より下）
     for (const sh of state.shapes) out.push(shapeSvg(sh));
     // ラベル
     if ($('#showLabels').checked && state.ev.P) {
@@ -593,6 +626,11 @@
     if (state.measA && state.cursor) out.push(measLine(state.measA, state.cursor.p, true));
     else if (state.measA) { const [x, y] = toS(state.measA); out.push(`<circle class="meas" cx="${x}" cy="${y}" r="3"/>`); }
     svg.innerHTML = out.join('');
+    if (state.teethG) {
+      const k = state.vp.k;
+      state.teethG.setAttribute('transform', `matrix(${k} 0 0 ${-k} ${W / 2 - state.vp.cx * k} ${H / 2 + state.vp.cy * k})`);
+      svg.querySelector('#teethSlot').replaceWith(state.teethG);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -930,7 +968,7 @@
     for (const b of document.querySelectorAll('#tabs button')) b.onclick = () => setTab(b.dataset.tab);
     setTab('left');
     for (const id of ['#bgSel', '#bgOp']) $(id).oninput = draw;
-    for (const id of ['#showTip', '#showRoot', '#showLabels']) $(id).onchange = () => { buildScene(); draw(); };
+    for (const id of ['#showTeeth', '#showTip', '#showRoot', '#showLabels']) $(id).onchange = () => { buildScene(); draw(); };
     for (const id of ['#fM1', '#fM2', '#fLayer']) $(id).onchange = () => { state.page = 0; applyView(); };
     for (const th of document.querySelectorAll('#resTable th')) {
       // クリック: 第1優先（同じ列なら昇降切替）, Shift+クリック: 第2優先

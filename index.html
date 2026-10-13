@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>歯車列 設計計算シート</title>
-<link rel="stylesheet" href="style.css?v=34">
+<link rel="stylesheet" href="style.css?v=35">
 </head>
 <body>
 <header>
   <h1>歯車列 設計計算シート</h1>
   <span class="sub">赤(駆動) → 緑(中間) → 青(出力1) / 黄(出力2, 内歯車)　n<sub>青</sub>:n<sub>黄</sub> = <span id="hdrRatio">15</span>:1</span>
-  <span id="ver" class="ver" title="更新日">v34 · 2026-10-13</span>
+  <span id="ver" class="ver" title="更新日">v35 · 2026-10-13</span>
 </header>
 
 <main>
@@ -55,6 +55,7 @@
     <div class="toolbar">
       <label title="図の背景に CAD 図・レイアウト図を同じ座標で重ねる">背景 <select id="bgSel"><option value="">なし</option></select></label>
       <label title="背景画像の濃さ">不透明度 <input type="range" id="bgOp" min="0" max="1" step="0.05" value="0.45"></label>
+      <label title="歯形（インボリュート歯面の輪郭，転位込み）を表示。かみ合う歯どうしが向き合うように回転させて描く。基礎円より内側は直線で近似"><input type="checkbox" id="showTeeth" checked> 歯形</label>
       <label title="歯先円（歯の先端を結んだ円，破線）を表示"><input type="checkbox" id="showTip" checked> 歯先円</label>
       <label title="歯底円（歯の根元を結んだ円，点線）を表示"><input type="checkbox" id="showRoot"> 歯底円</label>
       <label title="歯車・部品の名前を図に表示"><input type="checkbox" id="showLabels" checked> ラベル</label>
@@ -103,7 +104,7 @@
   <button type="button" data-tab="right">詳細</button>
 </nav>
 
-<script src="gearcore.js?v=34"></script>
-<script src="app.js?v=34"></script>
+<script src="gearcore.js?v=35"></script>
+<script src="app.js?v=35"></script>
 </body>
 </html>
