@@ -838,7 +838,8 @@
     addMeasPoint(sx, sy, e.shiftKey, false);
   });
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { state.measA = null; draw(); }
+    // Esc: 計測中の点があれば取消, なければ計測をすべて消す
+    if (e.key === 'Escape') { if (state.measA) state.measA = null; else state.meas = []; draw(); }
   });
 
   new ResizeObserver(() => draw()).observe(svg);
