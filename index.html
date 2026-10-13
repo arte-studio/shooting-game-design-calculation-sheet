@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>歯車列 設計計算シート</title>
-<link rel="stylesheet" href="style.css?v=17">
+<link rel="stylesheet" href="style.css?v=18">
 </head>
 <body>
 <header>
   <h1>歯車列 設計計算シート</h1>
   <span class="sub">赤(駆動) → 緑(中間) → 青(出力1) / 黄(出力2, 内歯車)　n<sub>青</sub>:n<sub>黄</sub> = <span id="hdrRatio">15</span>:1</span>
-  <span id="ver" class="ver" title="更新日">v17 · 2026-10-13</span>
+  <span id="ver" class="ver" title="更新日">v18 · 2026-10-13</span>
 </header>
 
 <main>
@@ -47,6 +47,8 @@
     </details>
   </section>
 
+  <div class="splitter" data-side="L" title="ドラッグで幅を変更（ダブルクリックで戻す）"></div>
+
   <!-- 中央: 図 -->
   <section id="center">
     <div class="toolbar">
@@ -65,6 +67,8 @@
     </div>
     <div class="status"><span id="cursorPos">x: – y: –</span><span class="hint pc">ホイール: ズーム / ドラッグ: 移動 / 右クリック×2: 2点間距離 (Shift で吸着なし, Esc で取消)</span><span class="hint touch">ピンチ: ズーム / ドラッグ: 移動 / タップ: 情報 / 長押し×2 または 計測モード: 2点間距離</span></div>
   </section>
+
+  <div class="splitter" data-side="R" title="ドラッグで幅を変更（ダブルクリックで戻す）"></div>
 
   <!-- 右: 詳細 -->
   <section id="right">
@@ -93,7 +97,7 @@
   <button type="button" data-tab="right">詳細</button>
 </nav>
 
-<script src="gearcore.js?v=17"></script>
-<script src="app.js?v=17"></script>
+<script src="gearcore.js?v=18"></script>
+<script src="app.js?v=18"></script>
 </body>
 </html>

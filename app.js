@@ -651,7 +651,59 @@
     return !!state.sel;
   }
 
+  // ---------------------------------------------------------------------------
+  // 列幅の変更（PC: 列の境界をドラッグ, ダブルクリックで既定に戻す）
+  // ---------------------------------------------------------------------------
+  const WIDTH_KEY = 'gearsheet.widths';
+  const W_DEF = { L: 360, R: 340 };
+  function applyWidths(w) {
+    const main = $('main');
+    main.style.setProperty('--wL', w.L + 'px');
+    main.style.setProperty('--wR', w.R + 'px');
+  }
+  function initSplitters() {
+    let w = Object.assign({}, W_DEF);
+    try { Object.assign(w, JSON.parse(localStorage.getItem(WIDTH_KEY) || '{}')); } catch (e) { /* 既定値 */ }
+    applyWidths(w);
+    const save = () => { try { localStorage.setItem(WIDTH_KEY, JSON.stringify(w)); } catch (e) { /* 保存不可 */ } };
+    for (const sp of document.querySelectorAll('.splitter')) {
+      const side = sp.dataset.side;
+      sp.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        sp.setPointerCapture(e.pointerId);
+        sp.classList.add('drag'); document.body.classList.add('resizing');
+        const x0 = e.clientX, w0 = w[side];
+        const total = $('main').getBoundingClientRect().width;
+        const move = (ev) => {
+          const dx = ev.clientX - x0;
+          const other = side === 'L' ? w.R : w.L;
+          // 各列 180px 以上, 図は 200px 以上を残す
+          w[side] = Math.round(Math.max(180, Math.min(total - other - 200 - 12, w0 + (side === 'L' ? dx : -dx))));
+          applyWidths(w);
+        };
+        const up = () => {
+          sp.removeEventListener('pointermove', move); sp.removeEventListener('pointerup', up);
+          sp.classList.remove('drag'); document.body.classList.remove('resizing');
+          save();
+        };
+        sp.addEventListener('pointermove', move);
+        sp.addEventListener('pointerup', up);
+      });
+      sp.addEventListener('dblclick', () => { w[side] = W_DEF[side]; applyWidths(w); save(); });
+    }
+    // ウィンドウが狭くなったら図の幅を残すよう表示上だけ縮める（保存値は変えない）
+    const fitToWindow = () => {
+      const total = $('main').getBoundingClientRect().width, over = w.L + w.R + 212 - total;
+      if (over <= 0) { applyWidths(w); return; }
+      const k = Math.max(0, (w.L + w.R - over) / (w.L + w.R));
+      applyWidths({ L: Math.max(180, Math.round(w.L * k)), R: Math.max(180, Math.round(w.R * k)) });
+    };
+    window.addEventListener('resize', fitToWindow);
+    fitToWindow();
+  }
+
   function init() {
+    initSplitters();
     buildForm(state.cfg);
     $('#hdrRatio').textContent = state.cfg.ratio;
     const bgSel = $('#bgSel');
