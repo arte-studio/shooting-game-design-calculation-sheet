@@ -34,11 +34,12 @@
     ['green1OuterMax', '緑1 最外点の上限半径', 'num'],
     ['grp', '配置探索 [mm]'],
     ['clrPurplePart', 'モーター ↔ P1・P3 すき間', 'num'], ['ballD', '球 直径（黄の中心）', 'num'], ['clrPurpleBall', 'モーター ↔ 球 すき間', 'num'],
+    ['blueMotor', '青 歯先円 ↔ モーター 重ならない', 'bool'], ['clrBlueMotor', '青 歯先円 ↔ モーター すき間', 'num', 'blueMotor'],
     ['motorTailD', 'モーター尻 直径（モーターと同心）', 'num'], ['motorTailXMin', 'モーター尻 全体が x > ', 'num'],
     ['redXRef', '赤 現在位置 x（移動量の基準）', 'num'], ['redYRef', '赤 中心 y 基準（現在位置 y）', 'num'], ['redYTol', '赤 中心 y 許容 ±', 'num'],
     ['xbMin', '青 x 下限', 'num'], ['xbMax', '青 x 上限', 'num'], ['xbStep', '青 x 刻み', 'num'],
   ];
-  const STORE_KEY = 'gearsheet.cfg.v14';
+  const STORE_KEY = 'gearsheet.cfg.v15';
 
   function loadCfg() {
     let saved = {};

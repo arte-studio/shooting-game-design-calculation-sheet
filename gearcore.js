@@ -90,6 +90,8 @@
     clrPurplePart: 0,       // モーター（紫円） ↔ P1（レバー）・P3（上部ブロック）の最小すき間（被らなければよい）
     ballD: 27,              // 黄の中心にある球の直径。モーター（紫円）と干渉させない
     clrPurpleBall: 0.5,     // モーター（紫円） ↔ 球 の最小すき間
+    blueMotor: true,        // 青の歯先円がモーター（紫円）と重ならない（メンテ性向上）
+    clrBlueMotor: 0,        // 上のすき間
     motorTailD: 28,         // モーター尻（紫円と同心）の直径
     motorTailXMin: 23.5,    // モーター尻の円全体が x > この値（ローラー固定のアルミ板との干渉防止）
     maxResults: 200000,
@@ -258,6 +260,10 @@
     }
     add('C9', 'モーター φ' + cfg.purpleD + ' ↔ 球 φ' + cfg.ballD, Math.hypot(P.R[0], P.R[1]) - (cfg.purpleD + cfg.ballD) / 2 - cfg.clrPurpleBall,
       'すき間 ' + (Math.hypot(P.R[0], P.R[1]) - (cfg.purpleD + cfg.ballD) / 2).toFixed(3) + ' mm');
+    if (cfg.blueMotor) {
+      const dBM = Math.hypot(P.R[0] - P.B[0], P.R[1] - P.B[1]) - rB - cfg.purpleD / 2;
+      add('C11', '青 歯先円 ↔ モーター φ' + cfg.purpleD, dBM - cfg.clrBlueMotor, 'すき間 ' + dBM.toFixed(3) + ' mm（メンテ性）');
+    }
     add('C10', 'モーター尻 φ' + cfg.motorTailD + ' が x > ' + cfg.motorTailXMin, P.R[0] - redXMin(cfg),
       '左端 x = ' + (P.R[0] - cfg.motorTailD / 2).toFixed(3));
     add('C7a', '青 中心 x ∈ [' + cfg.xbMin + ', ' + cfg.xbMax + ']', Math.min(P.B[0] - cfg.xbMin, cfg.xbMax - P.B[0]), 'x = ' + P.B[0].toFixed(3));
@@ -315,6 +321,7 @@
     let s = Math.min((cfg.brownD - cfg.purpleD) / 2 - rn, cfg.redYTol - Math.abs(R[1] - cfg.redYRef), R[0] - redXMin(cfg));
     s = Math.min(s, rn - redRmin(cfg));
     s = Math.min(s, Math.hypot(R[0] - B[0], R[1] - B[1]) - rR - blueObstacleR(cfg, D) - clrRedBlue(cfg));
+    if (cfg.blueMotor) s = Math.min(s, Math.hypot(R[0] - B[0], R[1] - B[1]) - D.B.da / 2 - cfg.purpleD / 2 - cfg.clrBlueMotor);
     if (cfg.checkCrossLayer) s = Math.min(s, D.Y.da / 2 - rn - rR - cfg.clrGear);
     if (s < 0) return s;
     s = Math.min(s, field.at(R[0], R[1]) - rR - cfg.clrPart);
