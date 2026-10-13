@@ -84,7 +84,8 @@
   // ---------------------------------------------------------------------------
   // 状態
   // ---------------------------------------------------------------------------
-  const FIG2_SET = { m1: 0.6, m2: 0.6, zr: 24, zb: 30, zg1: 70, zg2: 70, zy: 270 };
+  // 現行設計（参考配置）: m = 1.2, 赤 12, 青 12, 緑 35（一層）, 黄 135 → 速度比 135/12 = 11.25（目標 15 に不一致）
+  const FIG2_SET = { m1: 1.2, m2: 1.2, zr: 12, zb: 12, zg1: 35, zg2: 35, zy: 135 };
   const state = {
     cfg: loadCfg(),       // フォームの値
     runCfg: null,         // 結果を出したときの条件
@@ -95,15 +96,19 @@
   };
 
   function fig2Selection() {
+    // 赤を現在位置 R0 に置き, 緑 = 「原点中心 半径 a緑黄」と「R0 中心 半径 a緑赤」の交点（図2 の緑に近い方）,
+    // 青 = y = blueY 上で緑から a緑青 の点（図2 の青に近い方）として組み立てる
     const cfg = state.cfg;
     const D = GC.derive(cfg, FIG2_SET);
-    const ref = GC.FIG2_REFERENCE.center;
-    const xb = ref.blue[0];
-    let branch = 1, G = GC.greenCenter(D.aGY, D.aGB, xb, cfg.blueY, 1);
-    const G2 = GC.greenCenter(D.aGY, D.aGB, xb, cfg.blueY, -1);
-    if (G && G2 && Math.hypot(G2[0] - ref.green[0], G2[1] - ref.green[1]) < Math.hypot(G[0] - ref.green[0], G[1] - ref.green[1])) { branch = -1; G = G2; }
-    const phi = Math.atan2(ref.red[1] - G[1], ref.red[0] - G[0]);
-    return { s: Object.assign({}, FIG2_SET), pl: { xb, branch, phi }, zrList: null, title: '図2 の配置（参考, m=0.6 と仮定 / 比 9 のため不成立）', isRef: true };
+    const ref = GC.FIG2_REFERENCE.center, R0 = [cfg.redXRef, cfg.redYRef];
+    const near = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]);
+    const Gs = [1, -1].map((br) => GC.greenCenter(D.aGY, D.aGR, R0[0], R0[1], br)).filter(Boolean);
+    const G = Gs.sort((a, b) => near(a, ref.green) - near(b, ref.green))[0];
+    const dy = cfg.blueY - G[1], w = Math.sqrt(Math.max(0, D.aGB * D.aGB - dy * dy));
+    const xb = [G[0] - w, G[0] + w].sort((a, b) => Math.abs(a - ref.blue[0]) - Math.abs(b - ref.blue[0]))[0];
+    const branch = near(GC.greenCenter(D.aGY, D.aGB, xb, cfg.blueY, 1) || [1e9, 1e9], G) < 1e-6 ? 1 : -1;
+    const phi = Math.atan2(R0[1] - G[1], R0[0] - G[0]);
+    return { s: Object.assign({}, FIG2_SET), pl: { xb, branch, phi }, zrList: null, title: '現行設計（参考, m = 1.2 / 速度比 11.25 のため不成立）', isRef: true };
   }
 
   // ---------------------------------------------------------------------------
